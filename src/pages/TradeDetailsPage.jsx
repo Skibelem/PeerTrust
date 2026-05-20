@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { initializeTradePayment } from '../services/paymentService'
 import { getTradeById, markTradeDelivered } from '../services/tradeService'
 import { fundEscrow, confirmDeliveryAndReleaseFunds } from '../services/walletService'
 import { raiseTradeDispute } from '../services/disputeService'
@@ -226,6 +227,9 @@ export default function TradeDetailsPage() {
   const [disputeSuccess, setDisputeSuccess] = useState(false)
   const [showDisputeForm, setShowDisputeForm] = useState(false)
 
+  const [realPaymentLoading, setRealPaymentLoading] = useState(false)
+  const [realPaymentError, setRealPaymentError] = useState(null)
+
   // ── Fetch trade ─────────────────────────────────────────────────────────
   async function loadTrade(silent = false) {
     if (!silent) {
@@ -250,7 +254,7 @@ export default function TradeDetailsPage() {
     if (id) loadTrade()
   }, [id])
 
-  // ── Fund escrow ─────────────────────────────────────────────────────────
+  // ── Fund escrow demo ────────────────────────────────────────────────────
   async function handleFundEscrow() {
     if (!trade || !profile) return
 
@@ -272,6 +276,24 @@ export default function TradeDetailsPage() {
     await loadTrade(true)
     await retryFetchUserData()
     setFunding(false)
+  }
+
+  // ── Initialize real Paystack payment ────────────────────────────────────
+  async function handleRealPayment() {
+    if (!trade || !profile) return
+
+    setRealPaymentLoading(true)
+    setRealPaymentError(null)
+
+    const result = await initializeTradePayment(trade, profile)
+
+    if (!result.success) {
+      setRealPaymentError(result.error)
+      setRealPaymentLoading(false)
+      return
+    }
+
+    window.location.href = result.authorizationUrl
   }
 
   // ── Seller marks delivered ──────────────────────────────────────────────
@@ -486,6 +508,7 @@ export default function TradeDetailsPage() {
                     />
                   )}
 
+                  {/* Demo escrow funding */}
                   <button
                     onClick={handleFundEscrow}
                     disabled={funding || fundSuccess}
@@ -499,10 +522,46 @@ export default function TradeDetailsPage() {
                     ) : (
                       <>
                         <Wallet className="h-4 w-4" />
-                        Fund Escrow — {formatNGN(trade.amount)}
+                        Fund Escrow Demo — {formatNGN(trade.amount)}
                       </>
                     )}
                   </button>
+
+                  {/* Real Paystack test payment */}
+                  <div className="border-t border-slate-100 pt-4 mt-4 space-y-3">
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                      <p className="font-bold text-slate-800 text-sm">Real Payment Test</p>
+                      <p className="text-slate-500 text-xs mt-1 leading-relaxed">
+                        This initializes a Paystack test payment. The trade will not be marked as
+                        funded until payment verification/webhook is added in the next step.
+                      </p>
+                    </div>
+
+                    {realPaymentError && (
+                      <ErrorBlock
+                        error={realPaymentError}
+                        title="Paystack initialization failed"
+                      />
+                    )}
+
+                    <button
+                      onClick={handleRealPayment}
+                      disabled={realPaymentLoading}
+                      className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+                    >
+                      {realPaymentLoading ? (
+                        <>
+                          <Loader className="h-4 w-4 animate-spin" />
+                          Initializing Paystack…
+                        </>
+                      ) : (
+                        <>
+                          <Wallet className="h-4 w-4" />
+                          Pay with Paystack Test — {formatNGN(trade.amount)}
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </>
               )}
 
