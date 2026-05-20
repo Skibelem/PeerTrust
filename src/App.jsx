@@ -14,6 +14,7 @@ import MarketplacePage from './pages/MarketplacePage'
 import CreateOfferPage from './pages/CreateOfferPage'
 import TradesPage from './pages/TradesPage'
 import TradeDetailsPage from './pages/TradeDetailsPage'
+import AdminDisputesPage from './pages/AdminDisputesPage'
 
 export default function App() {
   return (
@@ -79,6 +80,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['buyer', 'seller']}>
                 <TradeDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/disputes"
+          element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDisputesPage />
               </ProtectedRoute>
             }
           />

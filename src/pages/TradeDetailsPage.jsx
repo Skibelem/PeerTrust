@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getTradeById, markTradeDelivered } from '../services/tradeService'
 import { fundEscrow, confirmDeliveryAndReleaseFunds } from '../services/walletService'
+import { raiseTradeDispute } from '../services/disputeService'
 import {
   ArrowLeft,
   LogOut,
@@ -218,6 +219,13 @@ export default function TradeDetailsPage() {
   const [releaseError, setReleaseError] = useState(null)
   const [releaseSuccess, setReleaseSuccess] = useState(false)
 
+  const [disputeReason, setDisputeReason] = useState('')
+  const [disputeMessage, setDisputeMessage] = useState('')
+  const [disputeLoading, setDisputeLoading] = useState(false)
+  const [disputeError, setDisputeError] = useState(null)
+  const [disputeSuccess, setDisputeSuccess] = useState(false)
+  const [showDisputeForm, setShowDisputeForm] = useState(false)
+
   // ── Fetch trade ─────────────────────────────────────────────────────────
   async function loadTrade(silent = false) {
     if (!silent) {
@@ -306,6 +314,38 @@ export default function TradeDetailsPage() {
     await loadTrade(true)
     await retryFetchUserData()
     setReleaseLoading(false)
+  }
+
+  // ── Buyer/Seller raises dispute ─────────────────────────────────────────
+  async function handleRaiseDispute() {
+    if (!trade || !profile) return
+
+    setDisputeLoading(true)
+    setDisputeError(null)
+    setDisputeSuccess(false)
+
+    const result = await raiseTradeDispute(
+      trade,
+      profile,
+      disputeReason,
+      disputeMessage
+    )
+
+    if (!result.success) {
+      setDisputeError(result.error)
+      setDisputeLoading(false)
+      return
+    }
+
+    setDisputeSuccess(true)
+    setDisputeReason('')
+    setDisputeMessage('')
+    setShowDisputeForm(false)
+
+    await loadTrade(true)
+    await retryFetchUserData()
+
+    setDisputeLoading(false)
   }
 
   // ── Derived UI state ───────────────────────────────────────────────────
@@ -591,6 +631,93 @@ export default function TradeDetailsPage() {
                 </>
               )}
 
+              {/* DISPUTE ACTION — buyer or seller can dispute funded/delivered trades */}
+              {(isBuyer || isSeller) && ['funded', 'delivered'].includes(status) && (
+                <div className="border-t border-slate-100 pt-5 space-y-4">
+                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex gap-3">
+                    <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-rose-800 text-sm">Problem with this trade?</p>
+                      <p className="text-rose-700 text-xs mt-1 leading-relaxed">
+                        Raise a dispute if there is an issue. Escrow funds will remain locked until
+                        admin review is added.
+                      </p>
+                    </div>
+                  </div>
+
+                  {!showDisputeForm && (
+                    <button
+                      onClick={() => setShowDisputeForm(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-6 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-colors text-sm"
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      Raise Dispute
+                    </button>
+                  )}
+
+                  {showDisputeForm && (
+                    <div className="space-y-3">
+                      <select
+                        value={disputeReason}
+                        onChange={(e) => setDisputeReason(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                      >
+                        <option value="">Select dispute reason</option>
+                        <option value="Seller did not deliver">Seller did not deliver</option>
+                        <option value="Buyer refused to confirm">Buyer refused to confirm</option>
+                        <option value="Wrong or incomplete delivery">Wrong or incomplete delivery</option>
+                        <option value="Quality issue">Quality issue</option>
+                        <option value="Other">Other</option>
+                      </select>
+
+                      <textarea
+                        value={disputeMessage}
+                        onChange={(e) => setDisputeMessage(e.target.value)}
+                        placeholder="Explain the issue clearly..."
+                        className="w-full min-h-[100px] rounded-xl border border-slate-200 p-3 text-sm outline-none focus:ring-2 focus:ring-rose-500"
+                      />
+
+                      {disputeError && (
+                        <ErrorBlock error={disputeError} title="Dispute creation failed" />
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          onClick={() => {
+                            setShowDisputeForm(false)
+                            setDisputeError(null)
+                            setDisputeReason('')
+                            setDisputeMessage('')
+                          }}
+                          disabled={disputeLoading}
+                          className="w-full py-3 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-sm"
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          onClick={handleRaiseDispute}
+                          disabled={disputeLoading}
+                          className="w-full flex items-center justify-center gap-2 py-3 px-6 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+                        >
+                          {disputeLoading ? (
+                            <>
+                              <Loader className="h-4 w-4 animate-spin" />
+                              Raising Dispute…
+                            </>
+                          ) : (
+                            <>
+                              <AlertTriangle className="h-4 w-4" />
+                              Submit Dispute
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* COMPLETED */}
               {status === 'completed' && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
@@ -605,8 +732,22 @@ export default function TradeDetailsPage() {
                 </div>
               )}
 
+              {/* DISPUTED */}
+              {status === 'disputed' && (
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 flex gap-3">
+                  <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-rose-800 text-sm">Dispute open</p>
+                    <p className="text-rose-700 text-xs mt-1 leading-relaxed">
+                      This trade has been disputed. Escrow funds remain locked until admin resolution
+                      is added in the next phase.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Any other status */}
-              {!['created', 'funded', 'delivered', 'completed'].includes(status) && (
+              {!['created', 'funded', 'delivered', 'completed', 'disputed'].includes(status) && (
                 <p className="text-slate-500 text-sm">
                   No escrow action available at this trade status.
                 </p>
@@ -643,6 +784,20 @@ export default function TradeDetailsPage() {
               </div>
             )}
 
+            {disputeSuccess && (
+              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 flex gap-3">
+                <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-rose-800 text-sm">
+                    Dispute submitted successfully!
+                  </p>
+                  <p className="text-rose-700 text-xs mt-1">
+                    The trade has been marked as disputed and escrow funds remain locked.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Offer + Parties */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
               <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
@@ -667,7 +822,7 @@ export default function TradeDetailsPage() {
                 label="Trade Amount"
                 value={formatNGN(trade.amount)}
                 accent
-                highlight={['funded', 'delivered', 'completed'].includes(status)}
+                highlight={['funded', 'delivered', 'completed', 'disputed'].includes(status)}
               />
               <DetailRow
                 icon={DollarSign}
