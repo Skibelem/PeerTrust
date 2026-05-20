@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { initializeTradePayment } from '../services/paymentService'
 import { getTradeById, markTradeDelivered } from '../services/tradeService'
-import { fundEscrow, confirmDeliveryAndReleaseFunds } from '../services/walletService'
+import { confirmDeliveryAndReleaseFunds } from '../services/walletService'
 import { raiseTradeDispute } from '../services/disputeService'
 import {
   ArrowLeft,
@@ -207,11 +207,6 @@ export default function TradeDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(null)
 
-  const [funding, setFunding] = useState(false)
-  const [fundError, setFundError] = useState(null)
-  const [fundSuccess, setFundSuccess] = useState(false)
-  const [isInsufficient, setIsInsufficient] = useState(false)
-
   const [deliveryMessage, setDeliveryMessage] = useState('')
   const [deliveryLoading, setDeliveryLoading] = useState(false)
   const [deliveryError, setDeliveryError] = useState(null)
@@ -254,29 +249,6 @@ export default function TradeDetailsPage() {
     if (id) loadTrade()
   }, [id])
 
-  // ── Fund escrow demo ────────────────────────────────────────────────────
-  async function handleFundEscrow() {
-    if (!trade || !profile) return
-
-    setFunding(true)
-    setFundError(null)
-    setFundSuccess(false)
-    setIsInsufficient(false)
-
-    const result = await fundEscrow(trade, profile)
-
-    if (!result.success) {
-      setFundError(result.error)
-      setIsInsufficient(result.isInsufficientFunds || false)
-      setFunding(false)
-      return
-    }
-
-    setFundSuccess(true)
-    await loadTrade(true)
-    await retryFetchUserData()
-    setFunding(false)
-  }
 
   // ── Initialize real Paystack payment ────────────────────────────────────
   async function handleRealPayment() {
@@ -446,8 +418,8 @@ export default function TradeDetailsPage() {
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-amber-800 text-xs leading-relaxed">
-                <span className="font-bold">Demo Mode:</span> Escrow funding and fund release use
-                simulated wallet balances only. No real money is processed or moved.
+                <span className="font-bold">Payment Notice:</span> Trade funding now uses Paystack test payments.
+                Fund release and admin resolution are still recorded inside the platform for MVP testing.
               </p>
             </div>
 
@@ -477,91 +449,46 @@ export default function TradeDetailsPage() {
               </h2>
 
               {/* BUYER — status: created */}
+              
               {isBuyer && status === 'created' && (
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
                     <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                     <p className="text-blue-800 text-xs leading-relaxed">
-                      Fund this trade's escrow using your demo wallet balance. Your available
-                      balance will decrease and escrow balance will increase by{' '}
-                      <span className="font-bold">{formatNGN(trade.amount)}</span>.
+                      Secure this trade by paying through Paystack. Once your payment is verified, the trade will
+                      be marked as funded and the seller can begin delivery.
                     </p>
                   </div>
 
-                  {isInsufficient && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-3">
-                      <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-bold text-orange-800 text-sm">
-                          Insufficient Demo Balance
-                        </p>
-                        <p className="text-orange-700 text-xs mt-1">{fundError?.message}</p>
-                      </div>
-                    </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <p className="font-bold text-slate-800 text-sm">Secure Paystack Payment</p>
+                    <p className="text-slate-500 text-xs mt-1 leading-relaxed">
+                      Your payment will be verified before this trade becomes active. No demo wallet balance is
+                      required for this real-payment flow.
+                    </p>
+                  </div>
+
+                  {realPaymentError && (
+                    <ErrorBlock error={realPaymentError} title="Paystack payment failed" />
                   )}
 
-                  {fundError && !isInsufficient && (
-                    <ErrorBlock
-                      error={fundError}
-                      title="Escrow funding failed"
-                      rlsSQL={ESCROW_RLS_SQL}
-                    />
-                  )}
-
-                  {/* Demo escrow funding */}
                   <button
-                    onClick={handleFundEscrow}
-                    disabled={funding || fundSuccess}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+                    onClick={handleRealPayment}
+                    disabled={realPaymentLoading}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
                   >
-                    {funding ? (
+                    {realPaymentLoading ? (
                       <>
                         <Loader className="h-4 w-4 animate-spin" />
-                        Funding Escrow…
+                        Initializing Payment…
                       </>
                     ) : (
                       <>
                         <Wallet className="h-4 w-4" />
-                        Fund Escrow Demo — {formatNGN(trade.amount)}
+                        Pay Securely with Paystack — {formatNGN(trade.amount)}
                       </>
                     )}
                   </button>
-
-                  {/* Real Paystack test payment */}
-                  <div className="border-t border-slate-100 pt-4 mt-4 space-y-3">
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                      <p className="font-bold text-slate-800 text-sm">Real Payment Test</p>
-                      <p className="text-slate-500 text-xs mt-1 leading-relaxed">
-                        This initializes a Paystack test payment. The trade will not be marked as
-                        funded until payment verification/webhook is added in the next step.
-                      </p>
-                    </div>
-
-                    {realPaymentError && (
-                      <ErrorBlock
-                        error={realPaymentError}
-                        title="Paystack initialization failed"
-                      />
-                    )}
-
-                    <button
-                      onClick={handleRealPayment}
-                      disabled={realPaymentLoading}
-                      className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
-                    >
-                      {realPaymentLoading ? (
-                        <>
-                          <Loader className="h-4 w-4 animate-spin" />
-                          Initializing Paystack…
-                        </>
-                      ) : (
-                        <>
-                          <Wallet className="h-4 w-4" />
-                          Pay with Paystack Test — {formatNGN(trade.amount)}
-                        </>
-                      )}
-                    </button>
-                  </div>
                 </>
               )}
 
@@ -813,21 +740,6 @@ export default function TradeDetailsPage() {
               )}
             </div>
 
-            {/* Success toasts */}
-            {fundSuccess && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
-                <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-emerald-800 text-sm">
-                    Escrow funded successfully!
-                  </p>
-                  <p className="text-emerald-700 text-xs mt-1">
-                    Wallet debited, escrow balance updated, wallet transaction recorded, and trade
-                    status set to funded.
-                  </p>
-                </div>
-              </div>
-            )}
 
             {releaseSuccess && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
