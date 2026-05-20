@@ -73,7 +73,7 @@ export default function PaymentCallbackPage() {
               Payment verified successfully
             </h1>
             <p className="text-sm text-slate-500 mt-2">
-              Your Paystack test payment has been confirmed and recorded.
+              Your Paystack test payment has been confirmed and the trade has been funded.
             </p>
             <p className="text-xs text-slate-400 mt-3 font-mono break-all">
               Reference: {reference}

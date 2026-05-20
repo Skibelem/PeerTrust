@@ -140,7 +140,7 @@ export async function verifyTradePayment(reference) {
   }
 
   const response = await fetch(
-    `/api/paystack/verify?reference=${encodeURIComponent(reference)}`
+    `/api/paystack/verify-and-fund?reference=${encodeURIComponent(reference)}`
   )
 
   const result = await response.json()
@@ -151,64 +151,18 @@ export async function verifyTradePayment(reference) {
       error: {
         message: result.message || 'Payment verification failed.',
         paystack: result.paystack || result,
-      },
-    }
-  }
-
-  const paystackData = result.data
-  const isSuccessful = paystackData.status === 'success'
-
-  const { data: payment, error: paymentFetchError } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('reference', reference)
-    .maybeSingle()
-
-  if (paymentFetchError) {
-    return {
-      success: false,
-      error: {
-        message: `Payment lookup failed: ${paymentFetchError.message}`,
-        ...paymentFetchError,
-      },
-    }
-  }
-
-  if (!payment) {
-    return {
-      success: false,
-      error: { message: 'Payment record not found in database.' },
-    }
-  }
-
-  const newStatus = isSuccessful ? 'successful' : 'failed'
-
-  const { error: paymentUpdateError } = await supabase
-    .from('payments')
-    .update({
-      status: newStatus,
-      provider_transaction_id: String(paystackData.id || ''),
-      provider_response: paystackData,
-      paid_at: isSuccessful ? new Date().toISOString() : null,
-      verified_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', payment.id)
-
-  if (paymentUpdateError) {
-    return {
-      success: false,
-      error: {
-        message: `Payment update failed: ${paymentUpdateError.message}`,
-        ...paymentUpdateError,
+        details: result.error || null,
       },
     }
   }
 
   return {
     success: true,
-    payment,
-    paystackData,
-    isSuccessful,
+    payment: result.payment,
+    trade: result.trade,
+    paystackData: result.paystackData,
+    isSuccessful: true,
+    alreadyProcessed: result.alreadyProcessed || false,
+    message: result.message,
   }
 }
