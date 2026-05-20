@@ -711,8 +711,7 @@ export default function TradeDetailsPage() {
                   <div>
                     <p className="font-bold text-emerald-800 text-sm">Trade completed</p>
                     <p className="text-emerald-700 text-xs mt-1 leading-relaxed">
-                      The buyer confirmed delivery and the demo escrow funds have been released to the
-                      seller.
+                      The buyer confirmed delivery. Seller payout is pending admin settlement.
                     </p>
                   </div>
                 </div>
@@ -749,7 +748,7 @@ export default function TradeDetailsPage() {
                     Delivery confirmed successfully!
                   </p>
                   <p className="text-emerald-700 text-xs mt-1">
-                    Demo escrow funds have been released to the seller.
+                    Delivery confirmed. Seller payout is now pending manual settlement.
                   </p>
                 </div>
               </div>
