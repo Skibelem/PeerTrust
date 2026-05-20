@@ -23,7 +23,9 @@ export async function initializeTradePayment(trade, currentProfile) {
   if (trade.status !== 'created') {
     return {
       success: false,
-      error: { message: `Payment can only be made when trade status is "created". Current status: "${trade.status}".` },
+      error: {
+        message: `Payment can only be made when trade status is "created". Current status: "${trade.status}".`,
+      },
     }
   }
 
@@ -127,8 +129,9 @@ export async function initializeTradePayment(trade, currentProfile) {
     authorizationUrl: paystackData.authorization_url,
     accessCode: paystackData.access_code,
   }
+}
 
-  export async function verifyTradePayment(reference) {
+export async function verifyTradePayment(reference) {
   if (!reference) {
     return {
       success: false,
@@ -208,5 +211,4 @@ export async function initializeTradePayment(trade, currentProfile) {
     paystackData,
     isSuccessful,
   }
-}
 }
