@@ -127,4 +127,86 @@ export async function initializeTradePayment(trade, currentProfile) {
     authorizationUrl: paystackData.authorization_url,
     accessCode: paystackData.access_code,
   }
+
+  export async function verifyTradePayment(reference) {
+  if (!reference) {
+    return {
+      success: false,
+      error: { message: 'Payment reference is missing.' },
+    }
+  }
+
+  const response = await fetch(
+    `/api/paystack/verify?reference=${encodeURIComponent(reference)}`
+  )
+
+  const result = await response.json()
+
+  if (!response.ok || !result.success) {
+    return {
+      success: false,
+      error: {
+        message: result.message || 'Payment verification failed.',
+        paystack: result.paystack || result,
+      },
+    }
+  }
+
+  const paystackData = result.data
+  const isSuccessful = paystackData.status === 'success'
+
+  const { data: payment, error: paymentFetchError } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('reference', reference)
+    .maybeSingle()
+
+  if (paymentFetchError) {
+    return {
+      success: false,
+      error: {
+        message: `Payment lookup failed: ${paymentFetchError.message}`,
+        ...paymentFetchError,
+      },
+    }
+  }
+
+  if (!payment) {
+    return {
+      success: false,
+      error: { message: 'Payment record not found in database.' },
+    }
+  }
+
+  const newStatus = isSuccessful ? 'successful' : 'failed'
+
+  const { error: paymentUpdateError } = await supabase
+    .from('payments')
+    .update({
+      status: newStatus,
+      provider_transaction_id: String(paystackData.id || ''),
+      provider_response: paystackData,
+      paid_at: isSuccessful ? new Date().toISOString() : null,
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', payment.id)
+
+  if (paymentUpdateError) {
+    return {
+      success: false,
+      error: {
+        message: `Payment update failed: ${paymentUpdateError.message}`,
+        ...paymentUpdateError,
+      },
+    }
+  }
+
+  return {
+    success: true,
+    payment,
+    paystackData,
+    isSuccessful,
+  }
+}
 }

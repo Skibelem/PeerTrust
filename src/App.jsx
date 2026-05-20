@@ -15,6 +15,7 @@ import CreateOfferPage from './pages/CreateOfferPage'
 import TradesPage from './pages/TradesPage'
 import TradeDetailsPage from './pages/TradeDetailsPage'
 import AdminDisputesPage from './pages/AdminDisputesPage'
+import PaymentCallbackPage from './pages/PaymentCallbackPage'
 
 export default function App() {
   return (
@@ -91,6 +92,8 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/payment/callback" element={<PaymentCallbackPage />} />
 
           {/* Fallback Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
