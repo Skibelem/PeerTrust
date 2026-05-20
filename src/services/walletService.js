@@ -40,13 +40,14 @@ export async function getWalletTransactions(walletId, limit = 10) {
 //  7. Insert escrow_transaction  (status = 'held')
 // ─────────────────────────────────────────────────────────────────────────────
 export async function fundEscrow(trade, currentProfile) {
-  // ── 1. Guards ─────────────────────────────────────────────────────────────
   if (!currentProfile?.id) {
     return { success: false, error: { message: 'You must be logged in.' } }
   }
+
   if (currentProfile.id !== trade.buyer_id) {
     return { success: false, error: { message: 'Only the buyer can fund escrow for this trade.' } }
   }
+
   if (trade.status !== 'created') {
     return {
       success: false,
@@ -56,16 +57,19 @@ export async function fundEscrow(trade, currentProfile) {
 
   const amount = Number(trade.amount)
 
-  // ── 2. Fetch buyer wallet ─────────────────────────────────────────────────
   const { data: wallet, error: walletFetchErr } = await getWalletByUserId(currentProfile.id)
+
   if (walletFetchErr) {
-    return { success: false, error: { message: `Failed to fetch wallet: ${walletFetchErr.message}`, ...walletFetchErr } }
+    return {
+      success: false,
+      error: { message: `Failed to fetch wallet: ${walletFetchErr.message}`, ...walletFetchErr },
+    }
   }
+
   if (!wallet) {
     return { success: false, error: { message: 'Buyer wallet not found. Please contact support.' } }
   }
 
-  // ── 3. Balance check ──────────────────────────────────────────────────────
   if (Number(wallet.available_balance) < amount) {
     return {
       success: false,
@@ -76,68 +80,101 @@ export async function fundEscrow(trade, currentProfile) {
     }
   }
 
-  const newAvailable = parseFloat((Number(wallet.available_balance) - amount).toFixed(2))
-  const newEscrow    = parseFloat((Number(wallet.escrow_balance)    + amount).toFixed(2))
+  const newAvailable = Number((Number(wallet.available_balance) - amount).toFixed(2))
+  const newEscrow = Number((Number(wallet.escrow_balance) + amount).toFixed(2))
 
-  // ── 4. Update wallet ──────────────────────────────────────────────────────
-  const { error: walletUpdateErr } = await supabase
+  // 1. Update buyer wallet
+  const { data: updatedWallet, error: walletUpdateErr } = await supabase
     .from('wallets')
-    .update({ available_balance: newAvailable, escrow_balance: newEscrow })
+    .update({
+      available_balance: newAvailable,
+      escrow_balance: newEscrow,
+    })
     .eq('id', wallet.id)
+    .select()
+    .single()
 
   if (walletUpdateErr) {
-    return { success: false, error: { message: `Wallet update failed: ${walletUpdateErr.message}`, ...walletUpdateErr } }
+    return {
+      success: false,
+      error: { message: `Wallet update failed: ${walletUpdateErr.message}`, ...walletUpdateErr },
+    }
   }
 
-  // ── 5. Update trade status ────────────────────────────────────────────────
-  const { error: tradeUpdateErr } = await supabase
+  // 2. Update trade status
+  const { data: updatedTrade, error: tradeUpdateErr } = await supabase
     .from('trades')
-    .update({ status: 'funds_locked' })
+    .update({ status: 'funded' })
     .eq('id', trade.id)
+    .select()
+    .single()
 
   if (tradeUpdateErr) {
-    return { success: false, error: { message: `Trade status update failed: ${tradeUpdateErr.message}`, ...tradeUpdateErr } }
+    return {
+      success: false,
+      error: { message: `Trade status update failed: ${tradeUpdateErr.message}`, ...tradeUpdateErr },
+    }
   }
 
-  // ── 6. Insert wallet_transaction ──────────────────────────────────────────
+    // ── 6. Insert wallet_transaction ──────────────────────────────────────────
   const reference = `WT-${Date.now()}-${trade.id.slice(0, 8)}`
-  const { error: wtxErr } = await supabase
+
+  const walletTransactionPayload = {
+    wallet_id: wallet.id,
+    trade_id: trade.id,
+    reference,
+    type: 'escrow_lock',
+    amount,
+    status: 'completed',
+    description: `Demo escrow funding for trade ${trade.id}`,
+  }
+
+  const { data: walletTransaction, error: wtxErr } = await supabase
     .from('wallet_transactions')
-    .insert([{
-      wallet_id:   wallet.id,
-      trade_id:    trade.id,
-      reference,
-      type:        'escrow_lock',
-      amount,
-      status:      'completed',
-      description: `Demo escrow funding for trade ${trade.id}`,
-    }])
+    .insert(walletTransactionPayload)
+    .select()
+    .single()
 
   if (wtxErr) {
-    // Non-fatal: wallet and trade already updated — log but continue
-    console.warn('[walletService] wallet_transaction insert failed:', wtxErr.message)
+    return {
+      success: false,
+      error: {
+        message: `Wallet transaction insert failed: ${wtxErr.message}`,
+        ...wtxErr,
+      },
+    }
   }
 
   // ── 7. Insert escrow_transaction ──────────────────────────────────────────
-  const { error: etxErr } = await supabase
+  const escrowTransactionPayload = {
+    trade_id: trade.id,
+    buyer_id: trade.buyer_id,
+    seller_id: trade.seller_id,
+    amount,
+    fee: Number(trade.platform_fee) || 0,
+    status: 'held',
+  }
+
+  const { data: escrowTransaction, error: etxErr } = await supabase
     .from('escrow_transactions')
-    .insert([{
-      trade_id:  trade.id,
-      buyer_id:  trade.buyer_id,
-      seller_id: trade.seller_id,
-      amount,
-      fee:       Number(trade.platform_fee) || 0,
-      status:    'held',
-    }])
+    .insert(escrowTransactionPayload)
+    .select()
+    .single()
 
   if (etxErr) {
-    console.warn('[walletService] escrow_transaction insert failed:', etxErr.message)
+    return {
+      success: false,
+      error: {
+        message: `Escrow transaction insert failed: ${etxErr.message}`,
+        ...etxErr,
+      },
+    }
   }
 
   return {
     success: true,
-    wtxError:  wtxErr  || null,
-    etxError:  etxErr  || null,
+    walletTransaction,
+    escrowTransaction,
     newAvailable,
     newEscrow,
     reference,

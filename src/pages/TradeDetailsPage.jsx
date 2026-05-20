@@ -20,42 +20,88 @@ import {
   Lock,
   Unlock,
   AlertTriangle,
-  RefreshCw,
   Wallet,
 } from 'lucide-react'
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function formatNGN(val) {
   return new Intl.NumberFormat('en-NG', {
-    style: 'currency', currency: 'NGN', minimumFractionDigits: 2,
+    style: 'currency',
+    currency: 'NGN',
+    minimumFractionDigits: 2,
   }).format(val || 0)
 }
 
 function formatDate(iso) {
   if (!iso) return '—'
   return new Intl.DateTimeFormat('en-NG', {
-    dateStyle: 'full', timeStyle: 'short',
+    dateStyle: 'full',
+    timeStyle: 'short',
   }).format(new Date(iso))
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 const STATUS_META = {
-  created:         { cls: 'bg-blue-50 text-blue-700 border-blue-200',         icon: Clock,       label: 'Awaiting Escrow' },
-  funds_locked:    { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: Lock,        label: 'Funded — Escrow Locked' },
-  seller_working:  { cls: 'bg-purple-50 text-purple-700 border-purple-200',    icon: Loader,      label: 'Seller Working' },
-  delivered:       { cls: 'bg-teal-50 text-teal-700 border-teal-200',          icon: ArrowRight,  label: 'Delivered' },
-  buyer_confirmed: { cls: 'bg-teal-50 text-teal-700 border-teal-200',          icon: CheckCircle, label: 'Buyer Confirmed' },
-  completed:       { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle, label: 'Completed' },
-  disputed:        { cls: 'bg-rose-50 text-rose-700 border-rose-200',          icon: AlertCircle, label: 'Disputed' },
-  cancelled:       { cls: 'bg-slate-100 text-slate-500 border-slate-200',      icon: XCircle,     label: 'Cancelled' },
-  refunded:        { cls: 'bg-orange-50 text-orange-700 border-orange-200',    icon: XCircle,     label: 'Refunded' },
+  created: {
+    cls: 'bg-blue-50 text-blue-700 border-blue-200',
+    icon: Clock,
+    label: 'Awaiting Escrow',
+  },
+  funded: {
+    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    icon: Lock,
+    label: 'Funded — Escrow Locked',
+  },
+  in_progress: {
+    cls: 'bg-purple-50 text-purple-700 border-purple-200',
+    icon: Loader,
+    label: 'Seller Working',
+  },
+  seller_working: {
+    cls: 'bg-purple-50 text-purple-700 border-purple-200',
+    icon: Loader,
+    label: 'Seller Working',
+  },
+  delivered: {
+    cls: 'bg-teal-50 text-teal-700 border-teal-200',
+    icon: ArrowRight,
+    label: 'Delivered',
+  },
+  buyer_confirmed: {
+    cls: 'bg-teal-50 text-teal-700 border-teal-200',
+    icon: CheckCircle,
+    label: 'Buyer Confirmed',
+  },
+  completed: {
+    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    icon: CheckCircle,
+    label: 'Completed',
+  },
+  disputed: {
+    cls: 'bg-rose-50 text-rose-700 border-rose-200',
+    icon: AlertCircle,
+    label: 'Disputed',
+  },
+  cancelled: {
+    cls: 'bg-slate-100 text-slate-500 border-slate-200',
+    icon: XCircle,
+    label: 'Cancelled',
+  },
+  refunded: {
+    cls: 'bg-orange-50 text-orange-700 border-orange-200',
+    icon: XCircle,
+    label: 'Refunded',
+  },
 }
 
 function StatusBadge({ status }) {
   const meta = STATUS_META[status] || STATUS_META.created
   const Icon = meta.icon
+
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-bold ${meta.cls}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-sm font-bold ${meta.cls}`}
+    >
       <Icon className="h-4 w-4" />
       {meta.label}
     </span>
@@ -65,15 +111,22 @@ function StatusBadge({ status }) {
 // ─── Detail row ───────────────────────────────────────────────────────────────
 function DetailRow({ icon: Icon, label, value, mono = false, accent = false, highlight = false }) {
   return (
-    <div className={`flex items-start justify-between gap-4 py-3.5 border-b border-slate-50 last:border-0 ${highlight ? 'rounded-lg px-2 -mx-2 bg-teal-50/50' : ''}`}>
+    <div
+      className={`flex items-start justify-between gap-4 py-3.5 border-b border-slate-50 last:border-0 ${
+        highlight ? 'rounded-lg px-2 -mx-2 bg-teal-50/50' : ''
+      }`}
+    >
       <div className="flex items-center gap-2 text-slate-500 text-sm min-w-0 shrink-0">
         <Icon className={`h-4 w-4 ${highlight ? 'text-teal-500' : 'text-slate-400'}`} />
         <span>{label}</span>
       </div>
-      <span className={`text-sm text-right break-all
-        ${mono    ? 'font-mono text-slate-600 text-xs'  : ''}
-        ${accent  ? 'font-extrabold text-slate-900 text-base' : 'font-semibold text-slate-800'}
-        ${highlight ? '!text-teal-800 font-bold' : ''}`}>
+
+      <span
+        className={`text-sm text-right break-all
+          ${mono ? 'font-mono text-slate-600 text-xs' : ''}
+          ${accent ? 'font-extrabold text-slate-900 text-base' : 'font-semibold text-slate-800'}
+          ${highlight ? '!text-teal-800 font-bold' : ''}`}
+      >
         {value ?? '—'}
       </span>
     </div>
@@ -83,19 +136,25 @@ function DetailRow({ icon: Icon, label, value, mono = false, accent = false, hig
 // ─── Inline error block ───────────────────────────────────────────────────────
 function ErrorBlock({ error, title = 'Error', rlsSQL = '' }) {
   if (!error) return null
+
   return (
     <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex gap-3">
       <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+
       <div className="min-w-0 w-full">
         <p className="font-bold text-red-800 text-sm">{title}</p>
+
         <p className="text-red-700 text-xs mt-1 font-mono break-all">
           {error.message || JSON.stringify(error)}
         </p>
+
         {error.code && (
           <p className="text-red-500 text-xs mt-0.5">
-            Code: {error.code}{error.hint ? ` · Hint: ${error.hint}` : ''}
+            Code: {error.code}
+            {error.hint ? ` · Hint: ${error.hint}` : ''}
           </p>
         )}
+
         {rlsSQL && (
           <div className="mt-3 p-3 bg-red-100 rounded-xl text-xs text-red-800 font-mono leading-relaxed">
             <p className="font-bold mb-1">Run in Supabase SQL Editor to fix RLS:</p>
@@ -151,33 +210,43 @@ export default function TradeDetailsPage() {
   const { id } = useParams()
   const { profile, retryFetchUserData, signOut } = useAuth()
 
-  const [trade, setTrade]             = useState(null)
-  const [loading, setLoading]         = useState(true)
-  const [fetchError, setFetchError]   = useState(null)
+  const [trade, setTrade] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
 
-  const [funding, setFunding]         = useState(false)
-  const [fundError, setFundError]     = useState(null)
+  const [funding, setFunding] = useState(false)
+  const [fundError, setFundError] = useState(null)
   const [fundSuccess, setFundSuccess] = useState(false)
   const [isInsufficient, setIsInsufficient] = useState(false)
 
   // ── Fetch trade ─────────────────────────────────────────────────────────
   async function loadTrade(silent = false) {
-    if (!silent) { setLoading(true); setFetchError(null) }
+    if (!silent) {
+      setLoading(true)
+      setFetchError(null)
+    }
+
     const { data, error } = await getTradeById(id)
-    if (error) setFetchError(error)
-    else setTrade(data)
-    if (!silent) setLoading(false)
+
+    if (error) {
+      setFetchError(error)
+    } else {
+      setTrade(data)
+    }
+
+    if (!silent) {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    let cancelled = false
     if (id) loadTrade()
-    return () => { cancelled = true }
   }, [id])
 
   // ── Fund escrow ─────────────────────────────────────────────────────────
   async function handleFundEscrow() {
     if (!trade || !profile) return
+
     setFunding(true)
     setFundError(null)
     setFundSuccess(false)
@@ -192,34 +261,43 @@ export default function TradeDetailsPage() {
       return
     }
 
-    // Success: refresh trade data and auth wallet balance
     setFundSuccess(true)
-    await loadTrade(true)           // re-fetch trade silently to get updated status
-    await retryFetchUserData()      // refresh wallet balance in AuthContext → Dashboard
+
+    // Re-fetch trade silently to get updated status: funded
+    await loadTrade(true)
+
+    // Refresh wallet balance in AuthContext/Dashboard
+    await retryFetchUserData()
+
     setFunding(false)
   }
 
   // ── Derived UI state ───────────────────────────────────────────────────
-  const isBuyer  = profile?.id === trade?.buyer_id
+  const isBuyer = profile?.id === trade?.buyer_id
   const isSeller = profile?.id === trade?.seller_id
-  const status   = trade?.status
+  const status = trade?.status
 
   return (
     <div className="bg-slate-50 min-h-screen">
-
       {/* Navbar */}
       <nav className="bg-slate-900 text-white shadow-sm py-4 px-6 md:px-12 flex justify-between items-center sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <Link to="/trades" className="flex items-center gap-1 text-slate-400 hover:text-white text-sm transition-colors">
+          <Link
+            to="/trades"
+            className="flex items-center gap-1 text-slate-400 hover:text-white text-sm transition-colors"
+          >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">My Trades</span>
           </Link>
+
           <span className="text-slate-700">|</span>
+
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-teal-400" />
             <span className="font-bold text-lg tracking-tight">Trade Details</span>
           </div>
         </div>
+
         <button
           onClick={signOut}
           className="flex items-center gap-1.5 text-sm font-semibold text-slate-300 hover:text-white transition-colors"
@@ -231,7 +309,6 @@ export default function TradeDetailsPage() {
 
       {/* Main */}
       <main className="max-w-2xl mx-auto px-6 md:px-12 py-10 space-y-6">
-
         {/* Loading */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-32">
@@ -253,6 +330,7 @@ export default function TradeDetailsPage() {
             <p className="text-slate-500 text-sm mt-2">
               This trade ID doesn't exist or you don't have access.
             </p>
+
             <Link
               to="/trades"
               className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-xl transition-colors"
@@ -263,10 +341,10 @@ export default function TradeDetailsPage() {
           </div>
         )}
 
-        {/* ── Trade content ──────────────────────────────────────────────────── */}
+        {/* Trade content */}
         {!loading && !fetchError && trade && (
           <>
-            {/* ① Demo warning banner — always visible */}
+            {/* Demo warning banner */}
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-amber-800 text-xs leading-relaxed">
@@ -275,21 +353,30 @@ export default function TradeDetailsPage() {
               </p>
             </div>
 
-            {/* ② Status + Amount header */}
+            {/* Status + Amount header */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Trade Status</p>
+                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">
+                  Trade Status
+                </p>
                 <StatusBadge status={status} />
               </div>
+
               <div className="text-left sm:text-right">
-                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Trade Amount</p>
-                <p className="text-2xl font-extrabold text-slate-900">{formatNGN(trade.amount)}</p>
+                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">
+                  Trade Amount
+                </p>
+                <p className="text-2xl font-extrabold text-slate-900">
+                  {formatNGN(trade.amount)}
+                </p>
               </div>
             </div>
 
-            {/* ③ Context-aware escrow action panel */}
+            {/* Context-aware escrow action panel */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-4">
-              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Escrow Action</h2>
+              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                Escrow Action
+              </h2>
 
               {/* BUYER — status: created → show Fund Escrow button */}
               {isBuyer && status === 'created' && (
@@ -308,19 +395,19 @@ export default function TradeDetailsPage() {
                     <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-3">
                       <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-bold text-orange-800 text-sm">Insufficient Demo Balance</p>
-                        <p className="text-orange-700 text-xs mt-1">
-                          {fundError?.message}
+                        <p className="font-bold text-orange-800 text-sm">
+                          Insufficient Demo Balance
                         </p>
+                        <p className="text-orange-700 text-xs mt-1">{fundError?.message}</p>
                         <p className="text-orange-600 text-xs mt-2">
-                          Demo balances are set to ₦0 by default. Ask your admin to top up your
-                          demo wallet balance via the Supabase dashboard to test escrow funding.
+                          Demo balances are controlled from the Supabase wallet table while this MVP
+                          is in demo mode.
                         </p>
                       </div>
                     </div>
                   )}
 
-                  {/* General fund error (not insufficient funds) */}
+                  {/* General fund error */}
                   {fundError && !isInsufficient && (
                     <ErrorBlock
                       error={fundError}
@@ -350,12 +437,14 @@ export default function TradeDetailsPage() {
                 </>
               )}
 
-              {/* BUYER — status: funds_locked → already funded */}
-              {isBuyer && status === 'funds_locked' && (
+              {/* BUYER — status: funded → already funded */}
+              {isBuyer && status === 'funded' && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
                   <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-emerald-800 text-sm">Funds are locked in escrow</p>
+                    <p className="font-bold text-emerald-800 text-sm">
+                      Funds are locked in escrow
+                    </p>
                     <p className="text-emerald-700 text-xs mt-1 leading-relaxed">
                       Your demo wallet has been debited. The seller can now proceed with delivery.
                       Seller confirmation and release will be added in Phase 5.
@@ -369,7 +458,9 @@ export default function TradeDetailsPage() {
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex gap-3">
                   <Clock className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-blue-800 text-sm">Waiting for buyer to fund escrow</p>
+                    <p className="font-bold text-blue-800 text-sm">
+                      Waiting for buyer to fund escrow
+                    </p>
                     <p className="text-blue-700 text-xs mt-1">
                       The buyer needs to fund the escrow before you can begin working on this trade.
                     </p>
@@ -377,12 +468,14 @@ export default function TradeDetailsPage() {
                 </div>
               )}
 
-              {/* SELLER — status: funds_locked → funded, ready to work */}
-              {isSeller && status === 'funds_locked' && (
+              {/* SELLER — status: funded → funded, ready to work */}
+              {isSeller && status === 'funded' && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
                   <Unlock className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-emerald-800 text-sm">Escrow funded — you can start working</p>
+                    <p className="font-bold text-emerald-800 text-sm">
+                      Escrow funded — you can start working
+                    </p>
                     <p className="text-emerald-700 text-xs mt-1 leading-relaxed">
                       The buyer has locked funds in escrow. Delivery confirmation and fund release
                       will be added in Phase 5.
@@ -392,14 +485,14 @@ export default function TradeDetailsPage() {
               )}
 
               {/* Any other status */}
-              {status !== 'created' && status !== 'funds_locked' && (
+              {status !== 'created' && status !== 'funded' && (
                 <p className="text-slate-500 text-sm">
                   No escrow action available at this trade status.
                 </p>
               )}
 
-              {/* Phase 5 disabled button (shown when funded) */}
-              {status === 'funds_locked' && (
+              {/* Phase 5 disabled button */}
+              {status === 'funded' && (
                 <button
                   disabled
                   className="w-full flex items-center justify-center gap-2 py-3 px-6 bg-slate-100 text-slate-400 border border-slate-200 font-bold rounded-xl cursor-not-allowed select-none text-sm mt-2"
@@ -410,51 +503,72 @@ export default function TradeDetailsPage() {
               )}
             </div>
 
-            {/* ④ Fund success toast */}
+            {/* Fund success toast */}
             {fundSuccess && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
                 <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold text-emerald-800 text-sm">Escrow funded successfully!</p>
+                  <p className="font-bold text-emerald-800 text-sm">
+                    Escrow funded successfully!
+                  </p>
                   <p className="text-emerald-700 text-xs mt-1">
-                    Wallet debited, escrow balance updated, and trade status set to "Funded".
-                    Your dashboard balance now reflects this change.
+                    Wallet debited, escrow balance updated, wallet transaction recorded, and trade
+                    status set to funded.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* ⑤ Offer + Parties */}
+            {/* Offer + Parties */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Offer &amp; Parties</h2>
-              <DetailRow icon={Tag}   label="Offer Title"   value={trade.offer?.title        || '(Offer deleted)'} />
-              <DetailRow icon={Tag}   label="Category"      value={trade.offer?.category      || '—'} />
+              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
+                Offer &amp; Parties
+              </h2>
+
+              <DetailRow icon={Tag} label="Offer Title" value={trade.offer?.title || '(Offer deleted)'} />
+              <DetailRow icon={Tag} label="Category" value={trade.offer?.category || '—'} />
               <DetailRow icon={Clock} label="Delivery Time" value={trade.offer?.delivery_time || '—'} />
-              <DetailRow icon={User}  label="Buyer"         value={trade.buyer?.full_name     || '—'} />
-              <DetailRow icon={User}  label="Seller"        value={trade.seller?.full_name    || '—'} />
+              <DetailRow icon={User} label="Buyer" value={trade.buyer?.full_name || '—'} />
+              <DetailRow icon={User} label="Seller" value={trade.seller?.full_name || '—'} />
             </div>
 
-            {/* ⑥ Financial breakdown */}
+            {/* Financial breakdown */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Financial Breakdown</h2>
+              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
+                Financial Breakdown
+              </h2>
+
               <DetailRow
-                icon={DollarSign} label="Trade Amount"        value={formatNGN(trade.amount)}
-                accent highlight={status === 'funds_locked'}
+                icon={DollarSign}
+                label="Trade Amount"
+                value={formatNGN(trade.amount)}
+                accent
+                highlight={status === 'funded'}
               />
-              <DetailRow icon={DollarSign} label="Platform Fee (2.5%)" value={formatNGN(trade.platform_fee)} />
-              <DetailRow icon={DollarSign} label="Seller Receives"     value={formatNGN(trade.seller_receives)} />
+              <DetailRow
+                icon={DollarSign}
+                label="Platform Fee (2.5%)"
+                value={formatNGN(trade.platform_fee)}
+              />
+              <DetailRow
+                icon={DollarSign}
+                label="Seller Receives"
+                value={formatNGN(trade.seller_receives)}
+              />
             </div>
 
-            {/* ⑦ Metadata */}
+            {/* Metadata */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Trade Metadata</h2>
-              <DetailRow icon={Shield} label="Trade ID"     value={trade.id}               mono />
-              <DetailRow icon={Clock}  label="Opened On"    value={formatDate(trade.created_at)} />
-              <DetailRow icon={Clock}  label="Last Updated" value={formatDate(trade.updated_at)} />
+              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
+                Trade Metadata
+              </h2>
+
+              <DetailRow icon={Shield} label="Trade ID" value={trade.id} mono />
+              <DetailRow icon={Clock} label="Opened On" value={formatDate(trade.created_at)} />
+              <DetailRow icon={Clock} label="Last Updated" value={formatDate(trade.updated_at)} />
             </div>
           </>
         )}
-
       </main>
     </div>
   )
