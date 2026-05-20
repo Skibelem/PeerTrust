@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getTradeById } from '../services/tradeService'
-import { fundEscrow } from '../services/walletService'
+import { getTradeById, markTradeDelivered } from '../services/tradeService'
+import { fundEscrow, confirmDeliveryAndReleaseFunds } from '../services/walletService'
 import {
   ArrowLeft,
   LogOut,
@@ -34,6 +34,7 @@ function formatNGN(val) {
 
 function formatDate(iso) {
   if (!iso) return '—'
+
   return new Intl.DateTimeFormat('en-NG', {
     dateStyle: 'full',
     timeStyle: 'short',
@@ -52,25 +53,10 @@ const STATUS_META = {
     icon: Lock,
     label: 'Funded — Escrow Locked',
   },
-  in_progress: {
-    cls: 'bg-purple-50 text-purple-700 border-purple-200',
-    icon: Loader,
-    label: 'Seller Working',
-  },
-  seller_working: {
-    cls: 'bg-purple-50 text-purple-700 border-purple-200',
-    icon: Loader,
-    label: 'Seller Working',
-  },
   delivered: {
     cls: 'bg-teal-50 text-teal-700 border-teal-200',
     icon: ArrowRight,
     label: 'Delivered',
-  },
-  buyer_confirmed: {
-    cls: 'bg-teal-50 text-teal-700 border-teal-200',
-    icon: CheckCircle,
-    label: 'Buyer Confirmed',
   },
   completed: {
     cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -186,6 +172,11 @@ CREATE POLICY "Buyer can update own trades"
 ON public.trades FOR UPDATE
 USING (auth.uid() = buyer_id);
 
+-- Seller can update their trades
+CREATE POLICY "Seller can update own trades"
+ON public.trades FOR UPDATE
+USING (auth.uid() = seller_id);
+
 -- Buyer can insert wallet_transactions
 CREATE POLICY "Buyer can insert wallet_transactions"
 ON public.wallet_transactions FOR INSERT
@@ -218,6 +209,14 @@ export default function TradeDetailsPage() {
   const [fundError, setFundError] = useState(null)
   const [fundSuccess, setFundSuccess] = useState(false)
   const [isInsufficient, setIsInsufficient] = useState(false)
+
+  const [deliveryMessage, setDeliveryMessage] = useState('')
+  const [deliveryLoading, setDeliveryLoading] = useState(false)
+  const [deliveryError, setDeliveryError] = useState(null)
+
+  const [releaseLoading, setReleaseLoading] = useState(false)
+  const [releaseError, setReleaseError] = useState(null)
+  const [releaseSuccess, setReleaseSuccess] = useState(false)
 
   // ── Fetch trade ─────────────────────────────────────────────────────────
   async function loadTrade(silent = false) {
@@ -262,14 +261,51 @@ export default function TradeDetailsPage() {
     }
 
     setFundSuccess(true)
-
-    // Re-fetch trade silently to get updated status: funded
     await loadTrade(true)
-
-    // Refresh wallet balance in AuthContext/Dashboard
     await retryFetchUserData()
-
     setFunding(false)
+  }
+
+  // ── Seller marks delivered ──────────────────────────────────────────────
+  async function handleMarkDelivered() {
+    if (!trade || !profile) return
+
+    setDeliveryLoading(true)
+    setDeliveryError(null)
+
+    const result = await markTradeDelivered(trade, profile, deliveryMessage)
+
+    if (!result.success) {
+      setDeliveryError(result.error)
+      setDeliveryLoading(false)
+      return
+    }
+
+    setDeliveryMessage('')
+    await loadTrade(true)
+    setDeliveryLoading(false)
+  }
+
+  // ── Buyer confirms delivery and releases funds ──────────────────────────
+  async function handleConfirmDelivery() {
+    if (!trade || !profile) return
+
+    setReleaseLoading(true)
+    setReleaseError(null)
+    setReleaseSuccess(false)
+
+    const result = await confirmDeliveryAndReleaseFunds(trade, profile)
+
+    if (!result.success) {
+      setReleaseError(result.error)
+      setReleaseLoading(false)
+      return
+    }
+
+    setReleaseSuccess(true)
+    await loadTrade(true)
+    await retryFetchUserData()
+    setReleaseLoading(false)
   }
 
   // ── Derived UI state ───────────────────────────────────────────────────
@@ -348,8 +384,8 @@ export default function TradeDetailsPage() {
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-amber-800 text-xs leading-relaxed">
-                <span className="font-bold">Demo Mode:</span> Escrow funding uses simulated wallet
-                balances only. No real money is processed or moved.
+                <span className="font-bold">Demo Mode:</span> Escrow funding and fund release use
+                simulated wallet balances only. No real money is processed or moved.
               </p>
             </div>
 
@@ -378,7 +414,7 @@ export default function TradeDetailsPage() {
                 Escrow Action
               </h2>
 
-              {/* BUYER — status: created → show Fund Escrow button */}
+              {/* BUYER — status: created */}
               {isBuyer && status === 'created' && (
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
@@ -390,7 +426,6 @@ export default function TradeDetailsPage() {
                     </p>
                   </div>
 
-                  {/* Insufficient funds warning */}
                   {isInsufficient && (
                     <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-3">
                       <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
@@ -399,15 +434,10 @@ export default function TradeDetailsPage() {
                           Insufficient Demo Balance
                         </p>
                         <p className="text-orange-700 text-xs mt-1">{fundError?.message}</p>
-                        <p className="text-orange-600 text-xs mt-2">
-                          Demo balances are controlled from the Supabase wallet table while this MVP
-                          is in demo mode.
-                        </p>
                       </div>
                     </div>
                   )}
 
-                  {/* General fund error */}
                   {fundError && !isInsufficient && (
                     <ErrorBlock
                       error={fundError}
@@ -416,7 +446,6 @@ export default function TradeDetailsPage() {
                     />
                   )}
 
-                  {/* Fund button */}
                   <button
                     onClick={handleFundEscrow}
                     disabled={funding || fundSuccess}
@@ -437,23 +466,7 @@ export default function TradeDetailsPage() {
                 </>
               )}
 
-              {/* BUYER — status: funded → already funded */}
-              {isBuyer && status === 'funded' && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
-                  <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-emerald-800 text-sm">
-                      Funds are locked in escrow
-                    </p>
-                    <p className="text-emerald-700 text-xs mt-1 leading-relaxed">
-                      Your demo wallet has been debited. The seller can now proceed with delivery.
-                      Seller confirmation and release will be added in Phase 5.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* SELLER — status: created → waiting for buyer */}
+              {/* SELLER — status: created */}
               {isSeller && status === 'created' && (
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex gap-3">
                   <Clock className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
@@ -462,48 +475,145 @@ export default function TradeDetailsPage() {
                       Waiting for buyer to fund escrow
                     </p>
                     <p className="text-blue-700 text-xs mt-1">
-                      The buyer needs to fund the escrow before you can begin working on this trade.
+                      The buyer needs to fund escrow before you can begin working.
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* SELLER — status: funded → funded, ready to work */}
-              {isSeller && status === 'funded' && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
-                  <Unlock className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+              {/* BUYER — status: funded */}
+              {isBuyer && status === 'funded' && (
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex gap-3">
+                  <Clock className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-emerald-800 text-sm">
-                      Escrow funded — you can start working
+                    <p className="font-bold text-blue-800 text-sm">Seller is working</p>
+                    <p className="text-blue-700 text-xs mt-1 leading-relaxed">
+                      Funds are locked in escrow. The seller will mark this trade as delivered when
+                      the work is done.
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* SELLER — status: funded */}
+              {isSeller && status === 'funded' && (
+                <>
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
+                    <Unlock className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-emerald-800 text-sm">
+                        Escrow funded — deliver the work
+                      </p>
+                      <p className="text-emerald-700 text-xs mt-1 leading-relaxed">
+                        The buyer has locked funds in escrow. Submit a delivery message when the work
+                        is complete.
+                      </p>
+                    </div>
+                  </div>
+
+                  <textarea
+                    value={deliveryMessage}
+                    onChange={(e) => setDeliveryMessage(e.target.value)}
+                    placeholder="Write a short delivery note, e.g. The service has been completed and delivered."
+                    className="w-full min-h-[100px] rounded-xl border border-slate-200 p-3 text-sm outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+
+                  {deliveryError && (
+                    <ErrorBlock error={deliveryError} title="Delivery update failed" />
+                  )}
+
+                  <button
+                    onClick={handleMarkDelivered}
+                    disabled={deliveryLoading}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+                  >
+                    {deliveryLoading ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin" />
+                        Marking Delivered…
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        Mark as Delivered
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+
+              {/* SELLER — status: delivered */}
+              {isSeller && status === 'delivered' && (
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex gap-3">
+                  <Clock className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-blue-800 text-sm">Delivery submitted</p>
+                    <p className="text-blue-700 text-xs mt-1 leading-relaxed">
+                      Waiting for the buyer to confirm delivery and release the escrow funds.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* BUYER — status: delivered */}
+              {isBuyer && status === 'delivered' && (
+                <>
+                  <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5">
+                    <p className="font-bold text-teal-800 text-sm">
+                      Seller marked this trade as delivered
+                    </p>
+                    <p className="text-teal-700 text-xs mt-2 leading-relaxed">
+                      {trade.delivery_message || 'No delivery message was provided.'}
+                    </p>
+                  </div>
+
+                  {releaseError && (
+                    <ErrorBlock error={releaseError} title="Fund release failed" />
+                  )}
+
+                  <button
+                    onClick={handleConfirmDelivery}
+                    disabled={releaseLoading || releaseSuccess}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+                  >
+                    {releaseLoading ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin" />
+                        Releasing Funds…
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        Confirm Delivery & Release Funds
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+
+              {/* COMPLETED */}
+              {status === 'completed' && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
+                  <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-emerald-800 text-sm">Trade completed</p>
                     <p className="text-emerald-700 text-xs mt-1 leading-relaxed">
-                      The buyer has locked funds in escrow. Delivery confirmation and fund release
-                      will be added in Phase 5.
+                      The buyer confirmed delivery and the demo escrow funds have been released to the
+                      seller.
                     </p>
                   </div>
                 </div>
               )}
 
               {/* Any other status */}
-              {status !== 'created' && status !== 'funded' && (
+              {!['created', 'funded', 'delivered', 'completed'].includes(status) && (
                 <p className="text-slate-500 text-sm">
                   No escrow action available at this trade status.
                 </p>
               )}
-
-              {/* Phase 5 disabled button */}
-              {status === 'funded' && (
-                <button
-                  disabled
-                  className="w-full flex items-center justify-center gap-2 py-3 px-6 bg-slate-100 text-slate-400 border border-slate-200 font-bold rounded-xl cursor-not-allowed select-none text-sm mt-2"
-                >
-                  <ArrowRight className="h-4 w-4" />
-                  Confirm Delivery — Coming in Phase 5
-                </button>
-              )}
             </div>
 
-            {/* Fund success toast */}
+            {/* Success toasts */}
             {fundSuccess && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
                 <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
@@ -514,6 +624,20 @@ export default function TradeDetailsPage() {
                   <p className="text-emerald-700 text-xs mt-1">
                     Wallet debited, escrow balance updated, wallet transaction recorded, and trade
                     status set to funded.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {releaseSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
+                <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-emerald-800 text-sm">
+                    Delivery confirmed successfully!
+                  </p>
+                  <p className="text-emerald-700 text-xs mt-1">
+                    Demo escrow funds have been released to the seller.
                   </p>
                 </div>
               </div>
@@ -543,7 +667,7 @@ export default function TradeDetailsPage() {
                 label="Trade Amount"
                 value={formatNGN(trade.amount)}
                 accent
-                highlight={status === 'funded'}
+                highlight={['funded', 'delivered', 'completed'].includes(status)}
               />
               <DetailRow
                 icon={DollarSign}

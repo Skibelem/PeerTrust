@@ -180,3 +180,33 @@ export async function fundEscrow(trade, currentProfile) {
     reference,
   }
 }
+
+export async function confirmDeliveryAndReleaseFunds(trade, currentProfile) {
+  if (!currentProfile?.id) {
+    return { success: false, error: { message: 'You must be logged in.' } }
+  }
+
+  if (currentProfile.id !== trade.buyer_id) {
+    return { success: false, error: { message: 'Only the buyer can confirm delivery.' } }
+  }
+
+  if (trade.status !== 'delivered') {
+    return {
+      success: false,
+      error: { message: `Delivery cannot be confirmed. Current status: "${trade.status}".` },
+    }
+  }
+
+  const { data, error } = await supabase.rpc('confirm_delivery_release_funds', {
+    p_trade_id: trade.id,
+  })
+
+  if (error) {
+    return {
+      success: false,
+      error: { message: `Fund release failed: ${error.message}`, ...error },
+    }
+  }
+
+  return { success: true, data }
+}

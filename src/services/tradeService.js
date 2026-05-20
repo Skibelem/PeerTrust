@@ -115,3 +115,75 @@ export async function updateTradeStatus(id, status, updates = {}) {
 
   return { data, error }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Seller marks a funded trade as delivered
+// Guards: seller only; trade must be funded
+// ─────────────────────────────────────────────────────────────────────────────
+export async function markTradeDelivered(trade, currentProfile, deliveryMessage = '') {
+  if (!currentProfile?.id) {
+    return {
+      success: false,
+      error: { message: 'You must be logged in.' },
+    }
+  }
+
+  if (currentProfile.id !== trade.seller_id) {
+    return {
+      success: false,
+      error: { message: 'Only the seller can mark this trade as delivered.' },
+    }
+  }
+
+  if (trade.status !== 'funded') {
+    return {
+      success: false,
+      error: {
+        message: `Trade cannot be marked as delivered. Current status: "${trade.status}".`,
+      },
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('trades')
+    .update({
+      status: 'delivered',
+      delivery_message:
+        deliveryMessage || 'The seller has marked this trade as delivered.',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', trade.id)
+    .select(`
+      id,
+      buyer_id,
+      seller_id,
+      offer_id,
+      amount,
+      platform_fee,
+      seller_receives,
+      status,
+      delivery_message,
+      delivery_proof_url,
+      created_at,
+      updated_at,
+      buyer:buyer_id ( full_name, email ),
+      seller:seller_id ( full_name, email ),
+      offer:offer_id ( title, category, delivery_time )
+    `)
+    .single()
+
+  if (error) {
+    return {
+      success: false,
+      error: {
+        message: `Delivery update failed: ${error.message}`,
+        ...error,
+      },
+    }
+  }
+
+  return {
+    success: true,
+    trade: data,
+  }
+}
