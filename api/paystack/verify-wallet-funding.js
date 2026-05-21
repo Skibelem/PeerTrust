@@ -68,10 +68,35 @@ export default async function handler(req, res) {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+    // Prevent repeated Paystack verification: if this reference was already processed successfully,
+    // return early and do not call Paystack again.
+    const { data: existingDeposit, error: depositLookupError } = await adminClient
+      .from('wallet_deposits')
+      .select('id, reference, amount, status')
+      .eq('reference', reference)
+      .maybeSingle()
+
+    if (depositLookupError) {
+      return json(res, 500, {
+        success: false,
+        error: depositLookupError.message,
+      })
+    }
+
+    if (existingDeposit?.status === 'successful') {
+      return json(res, 200, {
+        success: true,
+        reference,
+        amount: existingDeposit.amount,
+        alreadyProcessed: true,
+      })
+    }
+
     const { data, error } = await adminClient.rpc('complete_wallet_deposit', {
       p_reference: reference,
       p_provider_transaction_id: String(tx.id || ''),
     })
+
 
     if (error) {
       return json(res, 500, {
