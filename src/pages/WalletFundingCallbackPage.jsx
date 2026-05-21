@@ -22,24 +22,29 @@ export default function WalletFundingCallbackPage() {
   const reference = searchParams.get('reference') || searchParams.get('trxref')
 
   useEffect(() => {
+    let cancelled = false
+
     async function runVerification() {
+      if (!reference) {
+        setError({ message: 'Payment reference was not found.' })
+        setLoading(false)
+        return
+      }
+
+      const successKey = `wallet_funding_verified_${reference}`
+      const pendingKey = `wallet_funding_verifying_${reference}`
+
       try {
-        if (!reference) {
-          setError({ message: 'Payment reference was not found.' })
-          setLoading(false)
-          return
-        }
+        const cachedSuccess = sessionStorage.getItem(successKey)
 
-        const lockKey = `wallet_funding_verified_${reference}`
-        const cachedResult = sessionStorage.getItem(lockKey)
+        if (cachedSuccess) {
+          const parsed = JSON.parse(cachedSuccess)
 
-        // If this exact payment reference was already verified on this browser,
-        // bypass verification completely.
-        if (cachedResult) {
-          const parsed = JSON.parse(cachedResult)
-          setResult(parsed)
-          setError(null)
-          setLoading(false)
+          if (!cancelled) {
+            setResult(parsed)
+            setError(null)
+            setLoading(false)
+          }
 
           retryFetchUserData().catch((syncErr) => {
             console.warn('Wallet sync after cached funding failed:', syncErr)
@@ -48,8 +53,49 @@ export default function WalletFundingCallbackPage() {
           return
         }
 
-        // Call your backend service endpoint
+        const pendingStartedAt = sessionStorage.getItem(pendingKey)
+
+        if (pendingStartedAt) {
+          const age = Date.now() - Number(pendingStartedAt)
+
+          // If another callback request started recently, do not hammer the API.
+          // Wait briefly, then check if it has stored a success result.
+          if (age < 15000) {
+            setTimeout(() => {
+              const latestCachedSuccess = sessionStorage.getItem(successKey)
+
+              if (latestCachedSuccess) {
+                const parsed = JSON.parse(latestCachedSuccess)
+
+                if (!cancelled) {
+                  setResult(parsed)
+                  setError(null)
+                  setLoading(false)
+                }
+              } else if (!cancelled) {
+                setError({
+                  message:
+                    'Payment verification is taking longer than expected. If your Available Amount has updated, your funding was successful.',
+                })
+                setLoading(false)
+              }
+            }, 4000)
+
+            return
+          }
+
+          // Old pending lock; remove and try again.
+          sessionStorage.removeItem(pendingKey)
+        }
+
+        // Set this BEFORE calling the backend to prevent duplicate verification calls.
+        sessionStorage.setItem(pendingKey, String(Date.now()))
+
         const verifyResult = await verifyWalletFunding(reference)
+
+        sessionStorage.removeItem(pendingKey)
+
+        if (cancelled) return
 
         if (!verifyResult.success) {
           setError(
@@ -61,31 +107,32 @@ export default function WalletFundingCallbackPage() {
           return
         }
 
-        // Cache the valid verification result locally
-        sessionStorage.setItem(lockKey, JSON.stringify(verifyResult.data))
+        sessionStorage.setItem(successKey, JSON.stringify(verifyResult.data))
 
-        // OPTIMIZATION: Instantly update state to drop the loading screen
-        // and display the success pop-up.
         setResult(verifyResult.data)
         setError(null)
         setLoading(false)
 
-        // Run user profile sync seamlessly in the background.
-        // This completely removes background network lag from the user experience.
         retryFetchUserData().catch((syncErr) => {
           console.warn('Wallet sync after funding failed:', syncErr)
         })
-
       } catch (err) {
-        setError({
-          message: err.message || 'Something went wrong while verifying payment.',
-        })
-        setLoading(false)
+        sessionStorage.removeItem(pendingKey)
+
+        if (!cancelled) {
+          setError({
+            message: err.message || 'Something went wrong while verifying payment.',
+          })
+          setLoading(false)
+        }
       }
     }
 
     runVerification()
-    // Keeping retryFetchUserData omitted from dependencies prevents redundant re-runs.
+
+    return () => {
+      cancelled = true
+    }
   }, [reference])
 
   const amount = Number(result?.amount || result?.result?.amount || 0)
@@ -109,18 +156,18 @@ export default function WalletFundingCallbackPage() {
 
         {!loading && error && (
           <>
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-5" />
+            <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-5" />
 
             <h1 className="text-xl font-extrabold text-slate-900">
-              Funding Verification Issue
+              Verification Taking Longer
             </h1>
 
-            <p className="text-sm text-red-600 mt-2">
-              {error.message || 'Unable to verify payment.'}
+            <p className="text-sm text-slate-600 mt-2">
+              {error.message || 'Unable to verify payment immediately.'}
             </p>
 
             <p className="text-xs text-slate-500 mt-3">
-              If your dashboard amount has already updated, your payment was received successfully.
+              Check your dashboard. If your Available Amount has updated, your funding was successful.
             </p>
 
             <Link

@@ -37,6 +37,46 @@ export default async function handler(req, res) {
       })
     }
 
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+    // 1. Check our database FIRST before disturbing Paystack.
+    // If this deposit has already been completed, return success immediately.
+    const { data: existingDeposit, error: depositLookupError } = await adminClient
+      .from('wallet_deposits')
+      .select('id, reference, amount, status, verified_at, paid_at')
+      .eq('reference', reference)
+      .maybeSingle()
+
+    if (depositLookupError) {
+      return json(res, 500, {
+        success: false,
+        error: depositLookupError.message,
+      })
+    }
+
+    if (!existingDeposit) {
+      return json(res, 404, {
+        success: false,
+        error: 'Wallet deposit record not found.',
+      })
+    }
+
+    if (existingDeposit.status === 'successful') {
+      return json(res, 200, {
+        success: true,
+        reference,
+        amount: Number(existingDeposit.amount || 0),
+        alreadyProcessed: true,
+        result: {
+          success: true,
+          already_processed: true,
+          deposit_id: existingDeposit.id,
+          amount: Number(existingDeposit.amount || 0),
+        },
+      })
+    }
+
+    // 2. Only call Paystack when the deposit is still pending.
     const paystackResponse = await fetch(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
       {
@@ -66,37 +106,11 @@ export default async function handler(req, res) {
       })
     }
 
-    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-    // Prevent repeated Paystack verification: if this reference was already processed successfully,
-    // return early and do not call Paystack again.
-    const { data: existingDeposit, error: depositLookupError } = await adminClient
-      .from('wallet_deposits')
-      .select('id, reference, amount, status')
-      .eq('reference', reference)
-      .maybeSingle()
-
-    if (depositLookupError) {
-      return json(res, 500, {
-        success: false,
-        error: depositLookupError.message,
-      })
-    }
-
-    if (existingDeposit?.status === 'successful') {
-      return json(res, 200, {
-        success: true,
-        reference,
-        amount: existingDeposit.amount,
-        alreadyProcessed: true,
-      })
-    }
-
+    // 3. Complete wallet deposit atomically in Supabase.
     const { data, error } = await adminClient.rpc('complete_wallet_deposit', {
       p_reference: reference,
       p_provider_transaction_id: String(tx.id || ''),
     })
-
 
     if (error) {
       return json(res, 500, {
@@ -105,10 +119,12 @@ export default async function handler(req, res) {
       })
     }
 
+    // 4. Treat already_processed from RPC as success too.
     return json(res, 200, {
       success: true,
       reference,
-      amount: tx.amount / 100,
+      amount: Number(tx.amount || 0) / 100,
+      alreadyProcessed: Boolean(data?.already_processed),
       result: data,
     })
   } catch (err) {
