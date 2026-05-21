@@ -21,7 +21,7 @@ export default function WalletFundingCallbackPage() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
 
-  const reference = searchParams.get('reference')
+  const reference = searchParams.get('reference') || searchParams.get('trxref')
 
   useEffect(() => {
     if (hasRun.current) return
@@ -38,15 +38,21 @@ export default function WalletFundingCallbackPage() {
         const verifyResult = await verifyWalletFunding(reference)
 
         if (!verifyResult.success) {
-          setError(verifyResult.error || { message: 'Payment verification failed.' })
+          setError(
+            verifyResult.error || {
+              message: 'Payment verification failed.',
+            }
+          )
           setLoading(false)
           return
         }
 
+        // Show success screen immediately
         setResult(verifyResult.data)
+        setError(null)
         setLoading(false)
 
-        // Refresh dashboard balance without blocking this success page
+        // Refresh dashboard data without blocking this page
         retryFetchUserData().catch((syncErr) => {
           console.warn('Wallet sync after funding failed:', syncErr)
         })
@@ -61,6 +67,15 @@ export default function WalletFundingCallbackPage() {
     runVerification()
   }, [reference, retryFetchUserData])
 
+  // Extra safety: never allow page to remain stuck forever
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false)
+    }, 10000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
   const amount = Number(result?.amount || result?.result?.amount || 0)
 
   return (
@@ -69,9 +84,11 @@ export default function WalletFundingCallbackPage() {
         {loading && (
           <>
             <Loader className="h-12 w-12 text-teal-600 animate-spin mx-auto mb-5" />
+
             <h1 className="text-xl font-extrabold text-slate-900">
               Verifying Payment
             </h1>
+
             <p className="text-sm text-slate-500 mt-2">
               Please wait while we confirm your account funding.
             </p>
@@ -81,9 +98,11 @@ export default function WalletFundingCallbackPage() {
         {!loading && error && (
           <>
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-5" />
+
             <h1 className="text-xl font-extrabold text-slate-900">
               Funding Failed
             </h1>
+
             <p className="text-sm text-red-600 mt-2">
               {error.message || 'Unable to verify payment.'}
             </p>
@@ -101,6 +120,7 @@ export default function WalletFundingCallbackPage() {
         {!loading && !error && result && (
           <>
             <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto mb-5" />
+
             <h1 className="text-xl font-extrabold text-slate-900">
               Account Funded Successfully
             </h1>
@@ -122,6 +142,28 @@ export default function WalletFundingCallbackPage() {
                 Equivalent: {formatNGN(amount)}
               </p>
             </div>
+
+            <Link
+              to="/dashboard"
+              className="mt-6 inline-flex items-center justify-center gap-2 w-full px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-xl"
+            >
+              <Wallet className="h-4 w-4" />
+              Back to Dashboard
+            </Link>
+          </>
+        )}
+
+        {!loading && !error && !result && (
+          <>
+            <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto mb-5" />
+
+            <h1 className="text-xl font-extrabold text-slate-900">
+              Payment Verified
+            </h1>
+
+            <p className="text-sm text-slate-500 mt-2">
+              Your account funding has been processed.
+            </p>
 
             <Link
               to="/dashboard"
