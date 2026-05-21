@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { verifyWalletFunding } from '../services/walletFundingService'
@@ -15,6 +15,8 @@ export default function WalletFundingCallbackPage() {
   const [searchParams] = useSearchParams()
   const { retryFetchUserData } = useAuth()
 
+  const hasRun = useRef(false)
+
   const [loading, setLoading] = useState(true)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
@@ -22,50 +24,42 @@ export default function WalletFundingCallbackPage() {
   const reference = searchParams.get('reference')
 
   useEffect(() => {
-  let cancelled = false
+    if (hasRun.current) return
+    hasRun.current = true
 
-  async function runVerification() {
-    try {
-      if (!reference) {
-        if (!cancelled) {
+    async function runVerification() {
+      try {
+        if (!reference) {
           setError({ message: 'Payment reference was not found.' })
           setLoading(false)
+          return
         }
-        return
-      }
 
-      const verifyResult = await verifyWalletFunding(reference)
+        const verifyResult = await verifyWalletFunding(reference)
 
-      if (cancelled) return
+        if (!verifyResult.success) {
+          setError(verifyResult.error || { message: 'Payment verification failed.' })
+          setLoading(false)
+          return
+        }
 
-      if (!verifyResult.success) {
-        setError(verifyResult.error)
+        setResult(verifyResult.data)
         setLoading(false)
-        return
-      }
 
-      setResult(verifyResult.data)
-      setLoading(false)
-
-      retryFetchUserData().catch((syncErr) => {
-        console.warn('Wallet sync after funding failed:', syncErr)
-      })
-    } catch (err) {
-      if (!cancelled) {
+        // Refresh dashboard balance without blocking this success page
+        retryFetchUserData().catch((syncErr) => {
+          console.warn('Wallet sync after funding failed:', syncErr)
+        })
+      } catch (err) {
         setError({
           message: err.message || 'Something went wrong while verifying payment.',
         })
         setLoading(false)
       }
     }
-  }
 
-  runVerification()
-
-  return () => {
-    cancelled = true
-  }
-}, [reference])
+    runVerification()
+  }, [reference, retryFetchUserData])
 
   const amount = Number(result?.amount || result?.result?.amount || 0)
 
@@ -119,9 +113,11 @@ export default function WalletFundingCallbackPage() {
               <p className="text-xs text-slate-400 font-bold uppercase">
                 Amount Added
               </p>
+
               <p className="text-2xl font-extrabold text-slate-900 mt-1">
                 {formatPTC(amount)}
               </p>
+
               <p className="text-xs text-slate-500 mt-1">
                 Equivalent: {formatNGN(amount)}
               </p>
