@@ -35,6 +35,21 @@ function formatNGN(val) {
   }).format(val || 0)
 }
 
+const PTC_RATE = 100 // 1 PTC = ₦100
+
+function formatPTC(val) {
+  const credits = Number(val || 0) / PTC_RATE
+
+  return `${new Intl.NumberFormat('en-NG', {
+    minimumFractionDigits: credits % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(credits)} PTC`
+}
+
+function formatPTCWithNaira(val) {
+  return `${formatPTC(val)} (${formatNGN(val)})`
+}
+
 function formatDate(iso) {
   if (!iso) return '—'
 
@@ -413,8 +428,9 @@ export default function TradeDetailsPage() {
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-amber-800 text-xs leading-relaxed">
-                <span className="font-bold">Payment Notice:</span> Trade funding now uses Paystack test payments.
-                Fund release, refunds, and seller settlement are recorded inside the platform for MVP testing.
+                <span className="font-bold">Payment Notice:</span> PeerTrust displays trade value in PTC credits.
+                1 PTC = ₦100. Actual payments are processed in Nigerian Naira through Paystack.
+                Refunds and seller settlements are tracked inside the platform for MVP testing.
               </p>
             </div>
 
@@ -429,10 +445,13 @@ export default function TradeDetailsPage() {
 
               <div className="text-left sm:text-right">
                 <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">
-                  Trade Amount
+                  Trade Value
                 </p>
                 <p className="text-2xl font-extrabold text-slate-900">
-                  {formatNGN(trade.amount)}
+                  {formatPTC(trade.amount)}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Paystack amount: {formatNGN(trade.amount)}
                 </p>
               </div>
             </div>
@@ -449,6 +468,13 @@ export default function TradeDetailsPage() {
 
               {!moneySummaryError && (
                 <div className="space-y-1">
+                  <DetailRow
+                    icon={DollarSign}
+                    label="Trade Value"
+                    value={formatPTCWithNaira(trade.amount)}
+                    accent
+                  />
+
                   <DetailRow
                     icon={DollarSign}
                     label="Payment Provider"
@@ -493,7 +519,7 @@ export default function TradeDetailsPage() {
               )}
             </div>
 
-            {/* Context-aware escrow action panel */}
+            {/* Context-aware trade action panel */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-4">
               <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
                 Trade Action
@@ -513,8 +539,8 @@ export default function TradeDetailsPage() {
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                     <p className="font-bold text-slate-800 text-sm">Secure Paystack Payment</p>
                     <p className="text-slate-500 text-xs mt-1 leading-relaxed">
-                      Your payment will be verified before this trade becomes active. No demo wallet
-                      balance is required for this real-payment flow.
+                      This trade is valued at {formatPTC(trade.amount)}. You will pay the real Naira
+                      equivalent through Paystack: {formatNGN(trade.amount)}.
                     </p>
                   </div>
 
@@ -848,20 +874,20 @@ export default function TradeDetailsPage() {
 
               <DetailRow
                 icon={DollarSign}
-                label="Trade Amount"
-                value={formatNGN(trade.amount)}
+                label="Trade Value"
+                value={formatPTCWithNaira(trade.amount)}
                 accent
                 highlight={['funded', 'delivered', 'completed', 'disputed', 'refunded'].includes(status)}
               />
               <DetailRow
                 icon={DollarSign}
                 label="Platform Fee (2.5%)"
-                value={formatNGN(trade.platform_fee)}
+                value={formatPTCWithNaira(trade.platform_fee)}
               />
               <DetailRow
                 icon={DollarSign}
                 label="Seller Receives"
-                value={formatNGN(trade.seller_receives)}
+                value={formatPTCWithNaira(trade.seller_receives)}
               />
             </div>
 
