@@ -28,7 +28,8 @@ export async function getWalletTransactions(walletId, limit = 10) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fund escrow for a trade — demo wallet deduction only, no real money moved.
+// Fund escrow for a trade.
+
 //
 // Steps (sequential, each returns its own error):
 //  1. Guard checks (buyer only, status must be 'created')
@@ -74,7 +75,7 @@ export async function fundEscrow(trade, currentProfile) {
     return {
       success: false,
       error: {
-        message: `Insufficient demo wallet balance. Available: ₦${Number(wallet.available_balance).toLocaleString()}, Required: ₦${amount.toLocaleString()}.`,
+        message: `Insufficient wallet balance. Available: ₦${Number(wallet.available_balance).toLocaleString()}, Required: ₦${amount.toLocaleString()}.`,
       },
       isInsufficientFunds: true,
     }
@@ -126,7 +127,7 @@ export async function fundEscrow(trade, currentProfile) {
     type: 'escrow_lock',
     amount,
     status: 'completed',
-    description: `Demo escrow funding for trade ${trade.id}`,
+    description: `Escrow funding for trade ${trade.id}`,
   }
 
   const { data: walletTransaction, error: wtxErr } = await supabase

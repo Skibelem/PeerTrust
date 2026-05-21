@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 
-const PLATFORM_FEE_RATE = 0.025 // 2.5%
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Start a trade from a marketplace offer
@@ -19,9 +19,8 @@ export async function startTradeFromOffer(offer, buyerProfile) {
     return { data: null, error: { message: 'You cannot start a trade on your own offer.' } }
   }
 
-  const amount         = Number(offer.price)
-  const platform_fee   = parseFloat((amount * PLATFORM_FEE_RATE).toFixed(2))
-  const seller_receives = parseFloat((amount - platform_fee).toFixed(2))
+  const amount = Number(offer.price)
+  const seller_receives = amount
 
   const { data, error } = await supabase
     .from('trades')
@@ -31,9 +30,10 @@ export async function startTradeFromOffer(offer, buyerProfile) {
         seller_id:     offer.seller_id,
         offer_id:      offer.id,
         amount,
-        platform_fee,
+        platform_fee: 0,
         seller_receives,
         status:        'created',
+
       },
     ])
     .select()

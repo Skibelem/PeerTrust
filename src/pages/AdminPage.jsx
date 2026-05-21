@@ -35,13 +35,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Link
-            to="/profile-debug"
-            className="hidden sm:inline-flex items-center gap-1 text-slate-300 hover:text-white text-xs font-semibold bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
-          >
-            <Bug className="h-3.5 w-3.5" />
-            Profile Debugger
-          </Link>
+
 
           <button
             onClick={signOut}
@@ -159,29 +153,7 @@ export default function AdminPage() {
                 </div>
               </Link>
 
-            <Link
-              to="/profile-debug"
-              className="group bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-md hover:border-teal-200 transition-all"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="h-12 w-12 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center mb-4">
-                    <Bug className="h-6 w-6 text-teal-600" />
-                  </div>
 
-                  <h3 className="text-lg font-extrabold text-slate-900">
-                    Profile Debugger
-                  </h3>
-
-                  <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-                    Inspect the current authenticated user, profile role, wallet state, and Supabase
-                    session details.
-                  </p>
-                </div>
-
-                <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-teal-600 transition-colors shrink-0" />
-              </div>
-            </Link>
           </div>
         </div>
 
@@ -250,10 +222,7 @@ export default function AdminPage() {
                 <Settings className="h-5 w-5 text-slate-400" />
               </div>
 
-              <h2 className="text-3xl font-extrabold text-slate-900 mt-2">2.5%</h2>
-              <p className="text-[10px] text-slate-400 mt-4">
-                Platform fee rate for demo trades
-              </p>
+
             </div>
           </div>
         </div>
@@ -261,17 +230,19 @@ export default function AdminPage() {
         {/* Phase Notice */}
         <div className="bg-slate-900 text-white rounded-3xl p-6 relative overflow-hidden border border-slate-800 shadow-md">
           <h3 className="font-bold text-white text-md flex items-center gap-1.5">
+
             <RefreshCw className="h-4 w-4 text-yellow-400 mr-1 animate-spin" />
             Admin Dispute Controls Active
           </h3>
 
           <p className="text-xs text-slate-300 mt-2 leading-relaxed max-w-4xl">
-            You are viewing the administrator console. The dispute resolution center can now review
-            disputed trades and choose whether to refund the buyer or release demo escrow funds to
-            the seller. All actions remain simulated and do not process real money.
+            You are viewing the administrator console. The dispute resolution center can review
+            disputed trades and choose whether to refund the buyer or release escrow funds to the
+            seller.
           </p>
         </div>
       </main>
     </div>
   )
 }
+

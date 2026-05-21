@@ -38,20 +38,7 @@ export default function LoginPage() {
     }
   };
 
-  // Helper to quickly log in with demo accounts
-  const handleQuickLogin = async (demoEmail) => {
-    setEmail(demoEmail)
-    setPassword('password123') // Default password for demo
-    
-    setFormError('')
-    setSubmitting(true)
-    const { error: authError } = await signIn(demoEmail, 'password123')
-    setSubmitting(false)
-    
-    if (authError) {
-      setFormError(`Quick login failed: ${authError.message}. Make sure to register the account first.`)
-    }
-  }
+
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -64,7 +51,7 @@ export default function LoginPage() {
         <p className="mt-2 text-center text-sm text-slate-500">
           Or{' '}
           <Link to="/register" className="font-semibold text-teal-600 hover:text-teal-500">
-            register a new demo account
+            create a new account
           </Link>
         </p>
       </div>
@@ -148,38 +135,7 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Quick Demo Login Presets */}
-          <div className="mt-8 border-t border-slate-100 pt-6">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider text-center mb-4">
-              Demo Presets (Quick Login)
-            </h3>
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                onClick={() => handleQuickLogin('buyer@peertrust.demo')}
-                className="inline-flex justify-between items-center w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none transition-colors"
-              >
-                <span>Joel Buyer (Buyer Preset)</span>
-                <span className="text-teal-600">buyer@peertrust.demo</span>
-              </button>
-              <button
-                onClick={() => handleQuickLogin('seller@peertrust.demo')}
-                className="inline-flex justify-between items-center w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none transition-colors"
-              >
-                <span>Tunde Seller (Seller Preset)</span>
-                <span className="text-blue-600">seller@peertrust.demo</span>
-              </button>
-              <button
-                onClick={() => handleQuickLogin('admin@peertrust.demo')}
-                className="inline-flex justify-between items-center w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none transition-colors"
-              >
-                <span>Admin User (Admin Preset)</span>
-                <span className="text-slate-600">admin@peertrust.demo</span>
-              </button>
-            </div>
-            <p className="mt-3 text-[10px] text-slate-400 text-center">
-              Note: Preset logins require registering the emails first. The demo password for presets is <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">password123</code>.
-            </p>
-          </div>
+
 
         </div>
       </div>

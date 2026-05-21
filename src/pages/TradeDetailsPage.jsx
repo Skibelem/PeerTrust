@@ -430,7 +430,7 @@ export default function TradeDetailsPage() {
               <p className="text-amber-800 text-xs leading-relaxed">
                 <span className="font-bold">Payment Notice:</span> PeerTrust displays trade value in PTC credits.
                 1 PTC = ₦100. Actual payments are processed in Nigerian Naira through Paystack.
-                Refunds and seller settlements are tracked inside the platform for MVP testing.
+                Refunds and seller settlements are tracked inside the platform.
               </p>
             </div>
 
@@ -879,11 +879,7 @@ export default function TradeDetailsPage() {
                 accent
                 highlight={['funded', 'delivered', 'completed', 'disputed', 'refunded'].includes(status)}
               />
-              <DetailRow
-                icon={DollarSign}
-                label="Platform Fee (2.5%)"
-                value={formatPTCWithNaira(trade.platform_fee)}
-              />
+
               <DetailRow
                 icon={DollarSign}
                 label="Seller Receives"

@@ -30,8 +30,9 @@ export default function LandingPage() {
           <div className="space-y-6">
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-50 border border-teal-100 text-xs font-semibold text-teal-800">
               <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-ping"></span>
-              Supabase Auth Foundation Active
+              Secure Trade Payments
             </div>
+
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight">
               Secure P2P Escrow, Built on <span className="text-teal-600">Trust</span>
             </h1>
@@ -43,7 +44,8 @@ export default function LandingPage() {
                 to="/register"
                 className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-md group hover:-translate-y-0.5"
               >
-                Create Demo Account
+                Create Account
+
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
@@ -107,7 +109,7 @@ export default function LandingPage() {
       {/* Trust Badges footer */}
       <footer className="border-t border-slate-100 py-8 bg-slate-50/50">
         <div className="max-w-7xl mx-auto px-6 text-center text-sm text-slate-500">
-          <p>© 2026 PeerTrust. All simulated funds, profiles, and operations reside inside a secure Supabase environment.</p>
+          <p>© 2026 PeerTrust. Payments and trade activity are handled securely through Paystack and Supabase.</p>
         </div>
       </footer>
     </div>

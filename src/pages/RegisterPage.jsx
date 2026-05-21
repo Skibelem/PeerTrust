@@ -7,6 +7,7 @@ export default function RegisterPage() {
   const navigate = useNavigate()
   const { signUp, user, profile } = useAuth()
 
+
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -17,19 +18,14 @@ export default function RegisterPage() {
   const [formSuccess, setFormSuccess] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Dev logger utility
-  const devLog = (message, ...args) => {
-    if (import.meta.env.DEV) {
-      console.log(`[RegisterPage Dev] ${message}`, ...args)
-    }
-  }
+
 
   // Redirect if user is already logged in
   useEffect(() => {
     if (user && profile) {
-      devLog('Authenticated user detected, redirecting...', profile.role)
       const path = profile.role === 'admin' ? '/admin' : '/dashboard'
       navigate(path, { replace: true })
+
     }
   }, [user, profile, navigate])
   const handleSubmit = async (e) => {
@@ -117,9 +113,10 @@ export default function RegisterPage() {
           <Shield className="h-8 w-8 text-teal-600" />
           <span className="font-bold text-2xl text-slate-900 tracking-tight">PeerTrust</span>
         </Link>
-        <h2 className="text-center text-3xl font-extrabold text-slate-900">Create your demo account</h2>
+        <h2 className="text-center text-3xl font-extrabold text-slate-900">Create your account</h2>
         <p className="mt-2 text-center text-sm text-slate-500">
           Or{' '}
+
           <Link to="/login" className="font-semibold text-teal-600 hover:text-teal-500">
             sign in if you already have one
           </Link>
@@ -129,8 +126,9 @@ export default function RegisterPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
         <div className="bg-white py-8 px-4 shadow-sm border border-slate-100 rounded-2xl sm:px-10">
           
-          {/* 2. onSubmit binds directly to handleSubmit */}
-          <form className="space-y-6" onSubmit={handleSubmit}>
+      {/* Form */}
+      <form className="space-y-6" onSubmit={handleSubmit}>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="fullName" className="block text-sm font-semibold text-slate-700">
@@ -188,7 +186,8 @@ export default function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 sm:text-sm bg-slate-50 focus:bg-white transition-colors"
-                  placeholder="buyer@peertrust.demo"
+                placeholder="name@domain.com"
+
                 />
               </div>
             </div>
@@ -216,10 +215,9 @@ export default function RegisterPage() {
             {/* 8. Role Selection Blocks (Only Buyer and Seller) */}
             <div>
               <span className="block text-sm font-semibold text-slate-700 mb-2">
-                Choose Sandbox User Role
+                Choose account role
               </span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
                 {/* Buyer */}
                 <button
                   type="button"
@@ -235,11 +233,8 @@ export default function RegisterPage() {
                     {role === 'buyer' && <Check className="h-4 w-4 text-teal-600" />}
                   </div>
                   <p className="text-[10px] text-slate-500 leading-tight">
-                    Conduct mock trades and fund secured escrows safely.
+                    Browse offers and confirm delivery.
                   </p>
-                  <div className="mt-2 text-xs font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded inline-block">
-                    Init Balance: ₦250,000
-                  </div>
                 </button>
 
                 {/* Seller */}
@@ -257,15 +252,12 @@ export default function RegisterPage() {
                     {role === 'seller' && <Check className="h-4 w-4 text-blue-600" />}
                   </div>
                   <p className="text-[10px] text-slate-500 leading-tight">
-                    Fulfill mock trade orders and deliver tasks to receive payouts.
+                    Publish offers and fulfill deliveries.
                   </p>
-                  <div className="mt-2 text-xs font-semibold text-blue-800 bg-blue-50 px-2 py-0.5 rounded inline-block">
-                    Init Balance: ₦75,000
-                  </div>
                 </button>
-
               </div>
             </div>
+
 
             {/* 11. Error/Success Display below the form fields but above submit */}
             <div className="space-y-3">

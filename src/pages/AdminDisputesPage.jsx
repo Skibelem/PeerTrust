@@ -336,7 +336,8 @@ export default function AdminDisputesPage() {
                     </div>
                   </div>
 
-                  <div className="grid md:grid-cols-3 gap-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+
                     <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
                       <p className="text-xs text-emerald-600 font-bold uppercase">
                         Release to Seller
@@ -365,19 +366,7 @@ export default function AdminDisputesPage() {
                       </p>
                     </div>
 
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                      <p className="text-xs text-slate-400 font-bold uppercase">
-                        Platform Fee
-                      </p>
 
-                      <p className="text-lg font-extrabold text-slate-800">
-                        {formatPTC(trade.platform_fee)}
-                      </p>
-
-                      <p className="text-xs text-slate-500 mt-1">
-                        Equivalent: {formatNGN(trade.platform_fee)}
-                      </p>
-                    </div>
                   </div>
 
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
