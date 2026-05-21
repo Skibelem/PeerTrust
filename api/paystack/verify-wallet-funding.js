@@ -62,19 +62,22 @@ export default async function handler(req, res) {
     }
 
     if (existingDeposit.status === 'successful') {
+      // Deposit was already successfully processed; return success and do NOT call Paystack again.
+      const deposit = existingDeposit
       return json(res, 200, {
         success: true,
         reference,
-        amount: Number(existingDeposit.amount || 0),
+        amount: deposit.amount,
         alreadyProcessed: true,
         result: {
           success: true,
           already_processed: true,
-          deposit_id: existingDeposit.id,
-          amount: Number(existingDeposit.amount || 0),
+          deposit_id: deposit.id,
+          amount: deposit.amount,
         },
       })
     }
+
 
     // 2. Only call Paystack when the deposit is still pending.
     const paystackResponse = await fetch(

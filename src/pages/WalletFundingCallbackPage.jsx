@@ -1,15 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { verifyWalletFunding } from '../services/walletFundingService'
 import { formatNGN, formatPTC } from '../utils/moneyFormatters'
-import {
-  CheckCircle,
-  AlertCircle,
-  Loader,
-  ArrowRight,
-  Wallet,
-} from 'lucide-react'
+import { CheckCircle, Info, Loader, ArrowRight, Wallet } from 'lucide-react'
+
 
 export default function WalletFundingCallbackPage() {
   const [searchParams] = useSearchParams()
@@ -20,6 +15,8 @@ export default function WalletFundingCallbackPage() {
   const [error, setError] = useState(null)
 
   const reference = searchParams.get('reference') || searchParams.get('trxref')
+
+  const inFlightRef = useRef(new Map())
 
   useEffect(() => {
     let cancelled = false
@@ -33,12 +30,30 @@ export default function WalletFundingCallbackPage() {
 
       const successKey = `wallet_funding_verified_${reference}`
       const pendingKey = `wallet_funding_verifying_${reference}`
+      const fallbackKey = `wallet_funding_fallback_shown_${reference}`
+
+      const showFallbackIfStillLoading = () => {
+        if (cancelled) return
+        if (sessionStorage.getItem(fallbackKey)) return
+        sessionStorage.setItem(fallbackKey, '1')
+
+        setError({
+          message:
+            'Payment verification is taking longer than expected. If your Available Amount has updated, your funding was successful.',
+          isFallback: true,
+        })
+        setLoading(false)
+      }
 
       try {
         const cachedSuccess = sessionStorage.getItem(successKey)
 
+        // Only show fallback after 15-20s (never at 4s)
+        const pendingTimeout = setTimeout(showFallbackIfStillLoading, 18000)
+
         if (cachedSuccess) {
           const parsed = JSON.parse(cachedSuccess)
+          clearTimeout(pendingTimeout)
 
           if (!cancelled) {
             setResult(parsed)
@@ -46,10 +61,10 @@ export default function WalletFundingCallbackPage() {
             setLoading(false)
           }
 
+          // Sync in background; do not block UI.
           retryFetchUserData().catch((syncErr) => {
             console.warn('Wallet sync after cached funding failed:', syncErr)
           })
-
           return
         }
 
@@ -58,29 +73,9 @@ export default function WalletFundingCallbackPage() {
         if (pendingStartedAt) {
           const age = Date.now() - Number(pendingStartedAt)
 
-          // If another callback request started recently, do not hammer the API.
-          // Wait briefly, then check if it has stored a success result.
-          if (age < 15000) {
-            setTimeout(() => {
-              const latestCachedSuccess = sessionStorage.getItem(successKey)
-
-              if (latestCachedSuccess) {
-                const parsed = JSON.parse(latestCachedSuccess)
-
-                if (!cancelled) {
-                  setResult(parsed)
-                  setError(null)
-                  setLoading(false)
-                }
-              } else if (!cancelled) {
-                setError({
-                  message:
-                    'Payment verification is taking longer than expected. If your Available Amount has updated, your funding was successful.',
-                })
-                setLoading(false)
-              }
-            }, 4000)
-
+          // Another tab/page started verification. Do not hammer the API.
+          // We still allow the shared fallback timer to kick in (after 18s).
+          if (age < 600000) {
             return
           }
 
@@ -88,41 +83,78 @@ export default function WalletFundingCallbackPage() {
           sessionStorage.removeItem(pendingKey)
         }
 
-        // Set this BEFORE calling the backend to prevent duplicate verification calls.
+        // In-memory single-flight per reference (prevents duplicate calls inside SPA)
+        if (inFlightRef.current.has(reference)) {
+          const verifyResult = await inFlightRef.current.get(reference)
+          clearTimeout(pendingTimeout)
+          if (cancelled) return
+          if (!verifyResult?.success) {
+            setError(verifyResult?.error || { message: 'Payment verification failed.' })
+            setLoading(false)
+            return
+          }
+
+          const data = verifyResult.data
+          setResult(data)
+          setError(null)
+          setLoading(false)
+          retryFetchUserData().catch((syncErr) => {
+            console.warn('Wallet sync after funding failed:', syncErr)
+          })
+          return
+        }
+
         sessionStorage.setItem(pendingKey, String(Date.now()))
 
-        const verifyResult = await verifyWalletFunding(reference)
+        const verifyPromise = (async () => {
+          const verifyResult = await verifyWalletFunding(reference)
+          return verifyResult
+        })()
 
+        inFlightRef.current.set(reference, verifyPromise)
+
+        const verifyResult = await verifyPromise
+
+        inFlightRef.current.delete(reference)
         sessionStorage.removeItem(pendingKey)
+        clearTimeout(pendingTimeout)
 
         if (cancelled) return
 
-        if (!verifyResult.success) {
-          setError(
-            verifyResult.error || {
-              message: 'Payment verification failed.',
-            }
-          )
+        if (!verifyResult?.success) {
+          setError(verifyResult?.error || { message: 'Payment verification failed.' })
           setLoading(false)
           return
         }
 
-        sessionStorage.setItem(successKey, JSON.stringify(verifyResult.data))
+        const data = verifyResult.data
+        // Treat alreadyProcessed/already_processed as success too.
+        const backendSaysAlreadyProcessed =
+          verifyResult.alreadyProcessed === true ||
+          data?.already_processed === true ||
+          data?.alreadyProcessed === true
 
-        setResult(verifyResult.data)
+        if (backendSaysAlreadyProcessed || verifyResult.success) {
+          sessionStorage.setItem(successKey, JSON.stringify(data))
+          setResult(data)
+          setError(null)
+          setLoading(false)
+          // Sync in background only.
+          retryFetchUserData().catch((syncErr) => {
+            console.warn('Wallet sync after funding failed:', syncErr)
+          })
+          return
+        }
+
+        // Fallback: backend says success but we didn't receive expected data
+        sessionStorage.setItem(successKey, JSON.stringify(data))
+        setResult(data)
         setError(null)
         setLoading(false)
-
-        retryFetchUserData().catch((syncErr) => {
-          console.warn('Wallet sync after funding failed:', syncErr)
-        })
       } catch (err) {
         sessionStorage.removeItem(pendingKey)
-
         if (!cancelled) {
-          setError({
-            message: err.message || 'Something went wrong while verifying payment.',
-          })
+          setError({ message: err.message || 'Something went wrong while verifying payment.' })
           setLoading(false)
         }
       }
@@ -133,7 +165,8 @@ export default function WalletFundingCallbackPage() {
     return () => {
       cancelled = true
     }
-  }, [reference])
+  }, [reference, retryFetchUserData])
+
 
   const amount = Number(result?.amount || result?.result?.amount || 0)
 
@@ -156,19 +189,22 @@ export default function WalletFundingCallbackPage() {
 
         {!loading && error && (
           <>
-            <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-5" />
+            <Info className="h-12 w-12 text-teal-500 mx-auto mb-5" />
 
             <h1 className="text-xl font-extrabold text-slate-900">
               Verification Taking Longer
             </h1>
 
             <p className="text-sm text-slate-600 mt-2">
-              {error.message || 'Unable to verify payment immediately.'}
+              {error.message || 'Payment verification is taking longer than expected.'}
             </p>
 
-            <p className="text-xs text-slate-500 mt-3">
-              Check your dashboard. If your Available Amount has updated, your funding was successful.
-            </p>
+            {error.isFallback ? (
+              <p className="text-xs text-slate-500 mt-3">
+                Check your dashboard. If your Available Amount has updated, your funding was successful.
+              </p>
+            ) : null}
+
 
             <Link
               to="/dashboard"
@@ -189,6 +225,7 @@ export default function WalletFundingCallbackPage() {
         )}
 
         {!loading && !error && result && (
+
           <>
             <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto mb-5" />
 
