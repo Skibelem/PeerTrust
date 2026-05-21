@@ -17,6 +17,7 @@ import TradeDetailsPage from './pages/TradeDetailsPage'
 import AdminDisputesPage from './pages/AdminDisputesPage'
 import PaymentCallbackPage from './pages/PaymentCallbackPage'
 import AdminPayoutsPage from './pages/AdminPayoutsPage'
+import AdminRefundsPage from './pages/AdminRefundsPage'
 
 export default function App() {
   return (
@@ -101,6 +102,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminPayoutsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/refunds"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminRefundsPage />
               </ProtectedRoute>
             }
           />
