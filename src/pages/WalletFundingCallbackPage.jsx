@@ -34,7 +34,7 @@ export default function WalletFundingCallbackPage() {
         const cachedResult = sessionStorage.getItem(lockKey)
 
         // If this exact payment reference was already verified on this browser,
-        // do not keep calling Paystack again.
+        // bypass verification completely.
         if (cachedResult) {
           const parsed = JSON.parse(cachedResult)
           setResult(parsed)
@@ -48,6 +48,7 @@ export default function WalletFundingCallbackPage() {
           return
         }
 
+        // Call your backend service endpoint
         const verifyResult = await verifyWalletFunding(reference)
 
         if (!verifyResult.success) {
@@ -60,15 +61,21 @@ export default function WalletFundingCallbackPage() {
           return
         }
 
+        // Cache the valid verification result locally
         sessionStorage.setItem(lockKey, JSON.stringify(verifyResult.data))
 
+        // OPTIMIZATION: Instantly update state to drop the loading screen
+        // and display the success pop-up.
         setResult(verifyResult.data)
         setError(null)
         setLoading(false)
 
+        // Run user profile sync seamlessly in the background.
+        // This completely removes background network lag from the user experience.
         retryFetchUserData().catch((syncErr) => {
           console.warn('Wallet sync after funding failed:', syncErr)
         })
+
       } catch (err) {
         setError({
           message: err.message || 'Something went wrong while verifying payment.',
@@ -78,8 +85,7 @@ export default function WalletFundingCallbackPage() {
     }
 
     runVerification()
-    // Important: do not add retryFetchUserData to dependency array.
-    // It can change between renders and cause repeated verification calls.
+    // Keeping retryFetchUserData omitted from dependencies prevents redundant re-runs.
   }, [reference])
 
   const amount = Number(result?.amount || result?.result?.amount || 0)
