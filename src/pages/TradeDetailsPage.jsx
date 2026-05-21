@@ -5,6 +5,7 @@ import { initializeTradePayment } from '../services/paymentService'
 import { getTradeById, markTradeDelivered } from '../services/tradeService'
 import { confirmDeliveryAndReleaseFunds } from '../services/walletService'
 import { raiseTradeDispute } from '../services/disputeService'
+import { getTradeMoneySummary } from '../services/tradeMoneyService'
 import {
   ArrowLeft,
   LogOut,
@@ -48,12 +49,12 @@ const STATUS_META = {
   created: {
     cls: 'bg-blue-50 text-blue-700 border-blue-200',
     icon: Clock,
-    label: 'Awaiting Escrow',
+    label: 'Awaiting Payment',
   },
   funded: {
     cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     icon: Lock,
-    label: 'Funded — Escrow Locked',
+    label: 'Funded — Escrow Held',
   },
   delivered: {
     cls: 'bg-teal-50 text-teal-700 border-teal-200',
@@ -164,40 +165,6 @@ CREATE POLICY "Sellers can read their trades"
 ON public.trades FOR SELECT
 USING (auth.uid() = seller_id);`
 
-const ESCROW_RLS_SQL = `-- Buyer can update own wallet
-CREATE POLICY "Buyer can update own wallet"
-ON public.wallets FOR UPDATE
-USING (auth.uid() = user_id);
-
--- Buyer can update their trades
-CREATE POLICY "Buyer can update own trades"
-ON public.trades FOR UPDATE
-USING (auth.uid() = buyer_id);
-
--- Seller can update their trades
-CREATE POLICY "Seller can update own trades"
-ON public.trades FOR UPDATE
-USING (auth.uid() = seller_id);
-
--- Buyer can insert wallet_transactions
-CREATE POLICY "Buyer can insert wallet_transactions"
-ON public.wallet_transactions FOR INSERT
-WITH CHECK (
-  wallet_id IN (
-    SELECT id FROM public.wallets WHERE user_id = auth.uid()
-  )
-);
-
--- Buyer can insert escrow_transactions
-CREATE POLICY "Buyer can insert escrow_transactions"
-ON public.escrow_transactions FOR INSERT
-WITH CHECK (auth.uid() = buyer_id);
-
--- Seller can read escrow_transactions
-CREATE POLICY "Seller can read escrow_transactions"
-ON public.escrow_transactions FOR SELECT
-USING (auth.uid() = seller_id);`
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function TradeDetailsPage() {
   const { id } = useParams()
@@ -225,6 +192,9 @@ export default function TradeDetailsPage() {
   const [realPaymentLoading, setRealPaymentLoading] = useState(false)
   const [realPaymentError, setRealPaymentError] = useState(null)
 
+  const [moneySummary, setMoneySummary] = useState(null)
+  const [moneySummaryError, setMoneySummaryError] = useState(null)
+
   // ── Fetch trade ─────────────────────────────────────────────────────────
   async function loadTrade(silent = false) {
     if (!silent) {
@@ -243,12 +213,34 @@ export default function TradeDetailsPage() {
     if (!silent) {
       setLoading(false)
     }
+
+    return data
+  }
+
+  async function loadMoneySummary(tradeId = trade?.id) {
+    if (!tradeId) return
+
+    setMoneySummaryError(null)
+
+    const { data, error } = await getTradeMoneySummary(tradeId)
+
+    if (error) {
+      setMoneySummaryError(error)
+      return
+    }
+
+    setMoneySummary(data)
   }
 
   useEffect(() => {
     if (id) loadTrade()
   }, [id])
 
+  useEffect(() => {
+    if (trade?.id) {
+      loadMoneySummary(trade.id)
+    }
+  }, [trade?.id, trade?.status])
 
   // ── Initialize real Paystack payment ────────────────────────────────────
   async function handleRealPayment() {
@@ -284,11 +276,12 @@ export default function TradeDetailsPage() {
     }
 
     setDeliveryMessage('')
-    await loadTrade(true)
+    const freshTrade = await loadTrade(true)
+    await loadMoneySummary(freshTrade?.id || trade.id)
     setDeliveryLoading(false)
   }
 
-  // ── Buyer confirms delivery and releases funds ──────────────────────────
+  // ── Buyer confirms delivery and creates seller payout pending ───────────
   async function handleConfirmDelivery() {
     if (!trade || !profile) return
 
@@ -305,7 +298,8 @@ export default function TradeDetailsPage() {
     }
 
     setReleaseSuccess(true)
-    await loadTrade(true)
+    const freshTrade = await loadTrade(true)
+    await loadMoneySummary(freshTrade?.id || trade.id)
     await retryFetchUserData()
     setReleaseLoading(false)
   }
@@ -336,7 +330,8 @@ export default function TradeDetailsPage() {
     setDisputeMessage('')
     setShowDisputeForm(false)
 
-    await loadTrade(true)
+    const freshTrade = await loadTrade(true)
+    await loadMoneySummary(freshTrade?.id || trade.id)
     await retryFetchUserData()
 
     setDisputeLoading(false)
@@ -414,12 +409,12 @@ export default function TradeDetailsPage() {
         {/* Trade content */}
         {!loading && !fetchError && trade && (
           <>
-            {/* Demo warning banner */}
+            {/* Payment notice */}
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-amber-800 text-xs leading-relaxed">
                 <span className="font-bold">Payment Notice:</span> Trade funding now uses Paystack test payments.
-                Fund release and admin resolution are still recorded inside the platform for MVP testing.
+                Fund release, refunds, and seller settlement are recorded inside the platform for MVP testing.
               </p>
             </div>
 
@@ -442,29 +437,84 @@ export default function TradeDetailsPage() {
               </div>
             </div>
 
+            {/* Payment & Settlement Summary */}
+            <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
+                Payment &amp; Settlement Summary
+              </h2>
+
+              {moneySummaryError && (
+                <ErrorBlock error={moneySummaryError} title="Failed to load money summary" />
+              )}
+
+              {!moneySummaryError && (
+                <div className="space-y-1">
+                  <DetailRow
+                    icon={DollarSign}
+                    label="Payment Provider"
+                    value={moneySummary?.payment?.provider || '—'}
+                  />
+
+                  <DetailRow
+                    icon={CheckCircle}
+                    label="Payment Status"
+                    value={moneySummary?.payment?.status || 'Not paid yet'}
+                    highlight={moneySummary?.payment?.status === 'successful'}
+                  />
+
+                  <DetailRow
+                    icon={Shield}
+                    label="Payment Reference"
+                    value={moneySummary?.payment?.reference || '—'}
+                    mono
+                  />
+
+                  <DetailRow
+                    icon={Lock}
+                    label="Escrow Status"
+                    value={moneySummary?.escrow?.status || '—'}
+                    highlight={['held', 'released'].includes(moneySummary?.escrow?.status)}
+                  />
+
+                  <DetailRow
+                    icon={Wallet}
+                    label="Seller Payout"
+                    value={moneySummary?.payout?.status || '—'}
+                    highlight={moneySummary?.payout?.status === 'paid'}
+                  />
+
+                  <DetailRow
+                    icon={AlertCircle}
+                    label="Buyer Refund"
+                    value={moneySummary?.refund?.status || '—'}
+                    highlight={moneySummary?.refund?.status === 'processed'}
+                  />
+                </div>
+              )}
+            </div>
+
             {/* Context-aware escrow action panel */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-4">
               <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                Escrow Action
+                Trade Action
               </h2>
 
               {/* BUYER — status: created */}
-              
               {isBuyer && status === 'created' && (
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
                     <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                     <p className="text-blue-800 text-xs leading-relaxed">
-                      Secure this trade by paying through Paystack. Once your payment is verified, the trade will
-                      be marked as funded and the seller can begin delivery.
+                      Secure this trade by paying through Paystack. Once your payment is verified,
+                      the trade will be marked as funded and the seller can begin delivery.
                     </p>
                   </div>
 
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                     <p className="font-bold text-slate-800 text-sm">Secure Paystack Payment</p>
                     <p className="text-slate-500 text-xs mt-1 leading-relaxed">
-                      Your payment will be verified before this trade becomes active. No demo wallet balance is
-                      required for this real-payment flow.
+                      Your payment will be verified before this trade becomes active. No demo wallet
+                      balance is required for this real-payment flow.
                     </p>
                   </div>
 
@@ -498,10 +548,10 @@ export default function TradeDetailsPage() {
                   <Clock className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-bold text-blue-800 text-sm">
-                      Waiting for buyer to fund escrow
+                      Waiting for buyer payment
                     </p>
                     <p className="text-blue-700 text-xs mt-1">
-                      The buyer needs to fund escrow before you can begin working.
+                      The buyer needs to fund this trade through Paystack before you can begin working.
                     </p>
                   </div>
                 </div>
@@ -514,8 +564,8 @@ export default function TradeDetailsPage() {
                   <div>
                     <p className="font-bold text-blue-800 text-sm">Seller is working</p>
                     <p className="text-blue-700 text-xs mt-1 leading-relaxed">
-                      Funds are locked in escrow. The seller will mark this trade as delivered when
-                      the work is done.
+                      Your payment has been verified and held for this trade. The seller will mark
+                      this trade as delivered when the work is done.
                     </p>
                   </div>
                 </div>
@@ -528,11 +578,10 @@ export default function TradeDetailsPage() {
                     <Unlock className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold text-emerald-800 text-sm">
-                        Escrow funded — deliver the work
+                        Payment verified — deliver the work
                       </p>
                       <p className="text-emerald-700 text-xs mt-1 leading-relaxed">
-                        The buyer has locked funds in escrow. Submit a delivery message when the work
-                        is complete.
+                        The buyer has funded this trade. Submit a delivery message when the work is complete.
                       </p>
                     </div>
                   </div>
@@ -575,7 +624,7 @@ export default function TradeDetailsPage() {
                   <div>
                     <p className="font-bold text-blue-800 text-sm">Delivery submitted</p>
                     <p className="text-blue-700 text-xs mt-1 leading-relaxed">
-                      Waiting for the buyer to confirm delivery and release the escrow funds.
+                      Waiting for the buyer to confirm delivery. Seller payout will be queued after confirmation.
                     </p>
                   </div>
                 </div>
@@ -594,7 +643,7 @@ export default function TradeDetailsPage() {
                   </div>
 
                   {releaseError && (
-                    <ErrorBlock error={releaseError} title="Fund release failed" />
+                    <ErrorBlock error={releaseError} title="Delivery confirmation failed" />
                   )}
 
                   <button
@@ -605,12 +654,12 @@ export default function TradeDetailsPage() {
                     {releaseLoading ? (
                       <>
                         <Loader className="h-4 w-4 animate-spin" />
-                        Releasing Funds…
+                        Confirming Delivery…
                       </>
                     ) : (
                       <>
                         <CheckCircle className="h-4 w-4" />
-                        Confirm Delivery & Release Funds
+                        Confirm Delivery
                       </>
                     )}
                   </button>
@@ -625,8 +674,7 @@ export default function TradeDetailsPage() {
                     <div>
                       <p className="font-bold text-rose-800 text-sm">Problem with this trade?</p>
                       <p className="text-rose-700 text-xs mt-1 leading-relaxed">
-                        Raise a dispute if there is an issue. Escrow funds will remain locked until
-                        admin review is added.
+                        Raise a dispute if there is an issue. Funds remain locked until admin review.
                       </p>
                     </div>
                   </div>
@@ -724,21 +772,32 @@ export default function TradeDetailsPage() {
                   <div>
                     <p className="font-bold text-rose-800 text-sm">Dispute open</p>
                     <p className="text-rose-700 text-xs mt-1 leading-relaxed">
-                      This trade has been disputed. Escrow funds remain locked until admin resolution
-                      is added in the next phase.
+                      This trade has been disputed. Funds remain locked until admin resolution.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* REFUNDED */}
+              {status === 'refunded' && (
+                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex gap-3">
+                  <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-orange-800 text-sm">Trade refunded</p>
+                    <p className="text-orange-700 text-xs mt-1 leading-relaxed">
+                      This trade has been resolved in favour of the buyer. Check the buyer refund status above.
                     </p>
                   </div>
                 </div>
               )}
 
               {/* Any other status */}
-              {!['created', 'funded', 'delivered', 'completed', 'disputed'].includes(status) && (
+              {!['created', 'funded', 'delivered', 'completed', 'disputed', 'refunded'].includes(status) && (
                 <p className="text-slate-500 text-sm">
-                  No escrow action available at this trade status.
+                  No action available at this trade status.
                 </p>
               )}
             </div>
-
 
             {releaseSuccess && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex gap-3">
@@ -748,7 +807,7 @@ export default function TradeDetailsPage() {
                     Delivery confirmed successfully!
                   </p>
                   <p className="text-emerald-700 text-xs mt-1">
-                    Delivery confirmed. Seller payout is now pending manual settlement.
+                    Seller payout is now pending manual settlement.
                   </p>
                 </div>
               </div>
@@ -762,7 +821,7 @@ export default function TradeDetailsPage() {
                     Dispute submitted successfully!
                   </p>
                   <p className="text-rose-700 text-xs mt-1">
-                    The trade has been marked as disputed and escrow funds remain locked.
+                    The trade has been marked as disputed and funds remain locked.
                   </p>
                 </div>
               </div>
@@ -792,7 +851,7 @@ export default function TradeDetailsPage() {
                 label="Trade Amount"
                 value={formatNGN(trade.amount)}
                 accent
-                highlight={['funded', 'delivered', 'completed', 'disputed'].includes(status)}
+                highlight={['funded', 'delivered', 'completed', 'disputed', 'refunded'].includes(status)}
               />
               <DetailRow
                 icon={DollarSign}
