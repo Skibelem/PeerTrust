@@ -22,14 +22,21 @@ export default function WalletFundingCallbackPage() {
   const reference = searchParams.get('reference')
 
   useEffect(() => {
-    async function runVerification() {
+  let cancelled = false
+
+  async function runVerification() {
+    try {
       if (!reference) {
-        setError({ message: 'Payment reference was not found.' })
-        setLoading(false)
+        if (!cancelled) {
+          setError({ message: 'Payment reference was not found.' })
+          setLoading(false)
+        }
         return
       }
 
       const verifyResult = await verifyWalletFunding(reference)
+
+      if (cancelled) return
 
       if (!verifyResult.success) {
         setError(verifyResult.error)
@@ -38,12 +45,27 @@ export default function WalletFundingCallbackPage() {
       }
 
       setResult(verifyResult.data)
-      await retryFetchUserData()
       setLoading(false)
-    }
 
-    runVerification()
-  }, [reference])
+      retryFetchUserData().catch((syncErr) => {
+        console.warn('Wallet sync after funding failed:', syncErr)
+      })
+    } catch (err) {
+      if (!cancelled) {
+        setError({
+          message: err.message || 'Something went wrong while verifying payment.',
+        })
+        setLoading(false)
+      }
+    }
+  }
+
+  runVerification()
+
+  return () => {
+    cancelled = true
+  }
+}, [reference])
 
   const amount = Number(result?.amount || result?.result?.amount || 0)
 
