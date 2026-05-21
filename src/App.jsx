@@ -128,11 +128,7 @@ export default function App() {
 
           <Route
             path="/wallet/funding/callback"
-            element={
-              <ProtectedRoute allowedRoles={['buyer', 'seller']}>
-                <WalletFundingCallbackPage />
-              </ProtectedRoute>
-            }
+            element={<WalletFundingCallbackPage />}
           />
           {/* Fallback Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />

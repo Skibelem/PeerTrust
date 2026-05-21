@@ -10,6 +10,7 @@ export default function WalletFundingCallbackPage() {
   const { retryFetchUserData } = useAuth()
 
   const hasStartedRef = useRef(false)
+  const hasRedirectedRef = useRef(false)
   const reference = searchParams.get('reference') || searchParams.get('trxref')
 
   useEffect(() => {
@@ -21,14 +22,17 @@ export default function WalletFundingCallbackPage() {
       verifyWalletFunding(reference)
         .then(() => {
           // 9. Do not await retryFetchUserData before changing UI.
-          retryFetchUserData().catch((err) => console.warn('Wallet sync failed:', err))
+          retryFetchUserData?.().catch((err) => console.warn('Wallet sync failed:', err))
         })
         .catch((err) => console.warn('Verification failed:', err))
     }
 
     // 10. After 4 seconds, navigate automatically to /dashboard.
     const timer = setTimeout(() => {
-      navigate('/dashboard')
+      if (!hasRedirectedRef.current) {
+        hasRedirectedRef.current = true
+        navigate('/dashboard', { replace: true })
+      }
     }, 4000)
 
     return () => clearTimeout(timer)
