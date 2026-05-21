@@ -13,6 +13,7 @@ import {
   Gavel,
   ArrowRight,
   Bug,
+  Wallet,
 } from 'lucide-react'
 
 export default function AdminPage() {
@@ -108,6 +109,29 @@ export default function AdminPage() {
                 </div>
 
                 <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-rose-600 transition-colors shrink-0" />
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/payouts"
+              className="group bg-white border border-teal-100 rounded-3xl p-6 shadow-sm hover:shadow-md hover:border-teal-200 transition-all"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="h-12 w-12 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center mb-4">
+                    <Wallet className="h-6 w-6 text-teal-600" />
+                  </div>
+
+                  <h3 className="text-lg font-extrabold text-slate-900">
+                    Manage Seller Payouts
+                  </h3>
+
+                  <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+                    Review pending seller payouts, confirm manual settlements, and mark completed payouts as paid.
+                  </p>
+                </div>
+
+                <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-teal-600 transition-colors shrink-0" />
               </div>
             </Link>
 

@@ -16,6 +16,7 @@ import TradesPage from './pages/TradesPage'
 import TradeDetailsPage from './pages/TradeDetailsPage'
 import AdminDisputesPage from './pages/AdminDisputesPage'
 import PaymentCallbackPage from './pages/PaymentCallbackPage'
+import AdminPayoutsPage from './pages/AdminPayoutsPage'
 
 export default function App() {
   return (
@@ -86,7 +87,7 @@ export default function App() {
           />
           <Route
             path="/admin/disputes"
-          element={
+            element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminDisputesPage />
               </ProtectedRoute>
@@ -94,6 +95,15 @@ export default function App() {
           />
 
           <Route path="/payment/callback" element={<PaymentCallbackPage />} />
+
+          <Route
+            path="/admin/payouts"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminPayoutsPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Fallback Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
