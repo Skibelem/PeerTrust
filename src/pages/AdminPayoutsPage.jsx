@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getSellerPayouts, markSellerPayoutPaid } from '../services/payoutService'
+import { formatPTC, formatNGN, formatPTCWithNaira } from '../utils/moneyFormatters'
 import {
   ArrowLeft,
   Shield,
@@ -13,18 +14,12 @@ import {
   Wallet,
   User,
   DollarSign,
+  CreditCard,
 } from 'lucide-react'
-
-function formatNGN(val) {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 2,
-  }).format(val || 0)
-}
 
 function formatDate(iso) {
   if (!iso) return '—'
+
   return new Intl.DateTimeFormat('en-NG', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -37,12 +32,17 @@ function ErrorBlock({ error, title = 'Error' }) {
   return (
     <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex gap-3">
       <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+
       <div className="min-w-0">
         <p className="font-bold text-red-800 text-sm">{title}</p>
+
         <p className="text-red-700 text-xs mt-1 font-mono break-all">
           {error.message || JSON.stringify(error)}
         </p>
-        {error.code && <p className="text-red-500 text-xs mt-1">Code: {error.code}</p>}
+
+        {error.code && (
+          <p className="text-red-500 text-xs mt-1">Code: {error.code}</p>
+        )}
       </div>
     </div>
   )
@@ -82,7 +82,10 @@ export default function AdminPayoutsPage() {
 
   async function handleMarkPaid(payoutId) {
     const note = adminNotes[payoutId] || ''
-    const ok = window.confirm('Have you manually paid this seller? This will mark the payout as paid.')
+    const ok = window.confirm(
+      'Have you manually paid this seller? This will mark the payout as paid.'
+    )
+
     if (!ok) return
 
     setProcessingId(payoutId)
@@ -108,10 +111,15 @@ export default function AdminPayoutsPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
         <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm max-w-md text-center">
           <Shield className="h-10 w-10 text-slate-300 mx-auto mb-4" />
-          <h1 className="text-xl font-extrabold text-slate-900">Admin access required</h1>
+
+          <h1 className="text-xl font-extrabold text-slate-900">
+            Admin access required
+          </h1>
+
           <p className="text-sm text-slate-500 mt-2">
             Only admin users can manage seller payouts.
           </p>
+
           <Link
             to="/dashboard"
             className="mt-6 inline-flex px-5 py-3 rounded-xl bg-teal-600 text-white font-bold text-sm"
@@ -127,7 +135,10 @@ export default function AdminPayoutsPage() {
     <div className="min-h-screen bg-slate-50">
       <nav className="bg-slate-900 text-white py-4 px-6 md:px-12 flex justify-between items-center sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <Link to="/admin" className="flex items-center gap-1 text-slate-400 hover:text-white text-sm">
+          <Link
+            to="/admin"
+            className="flex items-center gap-1 text-slate-400 hover:text-white text-sm"
+          >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Admin Home</span>
           </Link>
@@ -155,11 +166,18 @@ export default function AdminPayoutsPage() {
             <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
               Admin Settlement
             </p>
+
             <h1 className="text-2xl font-extrabold text-slate-900 mt-1">
               Seller Payout Queue
             </h1>
+
             <p className="text-sm text-slate-500 mt-1">
               Review completed trades and mark seller payouts as paid after manual settlement.
+            </p>
+
+            <p className="text-xs text-slate-400 mt-2">
+              Payout values are displayed in PTC, with the Naira equivalent shown for manual payment.
+              1 PTC = ₦100.
             </p>
           </div>
 
@@ -209,7 +227,11 @@ export default function AdminPayoutsPage() {
         {!loading && !pageError && payouts.length === 0 && (
           <div className="bg-white border border-slate-100 rounded-3xl p-10 text-center shadow-sm">
             <CheckCircle className="h-10 w-10 text-emerald-400 mx-auto mb-4" />
-            <h2 className="font-extrabold text-slate-900 text-xl">No payouts found</h2>
+
+            <h2 className="font-extrabold text-slate-900 text-xl">
+              No payouts found
+            </h2>
+
             <p className="text-sm text-slate-500 mt-2">
               There are no seller payouts matching this filter.
             </p>
@@ -253,8 +275,13 @@ export default function AdminPayoutsPage() {
                     <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
                       Amount To Pay Seller
                     </p>
+
                     <p className="text-2xl font-extrabold text-slate-900">
-                      {formatNGN(payout.amount)}
+                      {formatPTC(payout.amount)}
+                    </p>
+
+                    <p className="text-xs text-slate-500 mt-1">
+                      Naira settlement: {formatNGN(payout.amount)}
                     </p>
                   </div>
                 </div>
@@ -264,10 +291,14 @@ export default function AdminPayoutsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase mb-2">
                       Seller
                     </p>
+
                     <p className="text-sm text-slate-700 flex items-center gap-2">
                       <User className="h-4 w-4 text-slate-400" />
-                      <span className="font-bold">{payout.seller?.full_name || '—'}</span>
+                      <span className="font-bold">
+                        {payout.seller?.full_name || '—'}
+                      </span>
                     </p>
+
                     <p className="text-xs text-slate-500 mt-2 break-all">
                       {payout.seller?.email || '—'}
                     </p>
@@ -277,12 +308,18 @@ export default function AdminPayoutsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase mb-2">
                       Buyer / Trade
                     </p>
+
                     <p className="text-sm text-slate-700">
-                      Buyer: <span className="font-bold">{payout.trade?.buyer?.full_name || '—'}</span>
+                      Buyer:{' '}
+                      <span className="font-bold">
+                        {payout.trade?.buyer?.full_name || '—'}
+                      </span>
                     </p>
+
                     <p className="text-xs text-slate-500 mt-2">
                       Created: {formatDate(payout.created_at)}
                     </p>
+
                     {payout.paid_at && (
                       <p className="text-xs text-emerald-600 mt-2">
                         Paid: {formatDate(payout.paid_at)}
@@ -296,7 +333,12 @@ export default function AdminPayoutsPage() {
                     <p className="text-xs text-emerald-600 font-bold uppercase">
                       Seller Receives
                     </p>
+
                     <p className="text-lg font-extrabold text-emerald-800">
+                      {formatPTC(payout.amount)}
+                    </p>
+
+                    <p className="text-xs text-emerald-700 mt-1">
                       {formatNGN(payout.amount)}
                     </p>
                   </div>
@@ -305,6 +347,7 @@ export default function AdminPayoutsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase">
                       Method
                     </p>
+
                     <p className="text-sm font-bold text-slate-800 mt-1">
                       {payout.payment_method || 'manual_bank_transfer'}
                     </p>
@@ -314,10 +357,21 @@ export default function AdminPayoutsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase">
                       Trade Status
                     </p>
+
                     <p className="text-sm font-bold text-slate-800 mt-1">
                       {payout.trade?.status || '—'}
                     </p>
                   </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
+                  <CreditCard className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+
+                  <p className="text-xs text-blue-800 leading-relaxed">
+                    Before marking this payout as paid, make sure you have manually settled the seller
+                    with the Naira amount: <span className="font-bold">{formatNGN(payout.amount)}</span>.
+                    Internal value: <span className="font-bold">{formatPTC(payout.amount)}</span>.
+                  </p>
                 </div>
 
                 {payout.status === 'pending' && (
@@ -359,7 +413,10 @@ export default function AdminPayoutsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase">
                       Admin Note
                     </p>
-                    <p className="text-sm text-slate-700 mt-1">{payout.admin_note}</p>
+
+                    <p className="text-sm text-slate-700 mt-1">
+                      {payout.admin_note}
+                    </p>
                   </div>
                 )}
               </div>

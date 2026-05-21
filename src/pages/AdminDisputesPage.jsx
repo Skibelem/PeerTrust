@@ -6,6 +6,7 @@ import {
   adminReleaseDisputedTrade,
   adminRefundDisputedTrade,
 } from '../services/adminService'
+import { formatPTC, formatNGN } from '../utils/moneyFormatters'
 import {
   Shield,
   ArrowLeft,
@@ -16,18 +17,12 @@ import {
   User,
   DollarSign,
   LogOut,
+  CreditCard,
 } from 'lucide-react'
-
-function formatNGN(val) {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 2,
-  }).format(val || 0)
-}
 
 function formatDate(iso) {
   if (!iso) return '—'
+
   return new Intl.DateTimeFormat('en-NG', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -40,11 +35,14 @@ function ErrorBlock({ error, title = 'Error' }) {
   return (
     <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex gap-3">
       <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+
       <div className="min-w-0">
         <p className="font-bold text-red-800 text-sm">{title}</p>
+
         <p className="text-red-700 text-xs mt-1 font-mono break-all">
           {error.message || JSON.stringify(error)}
         </p>
+
         {error.code && (
           <p className="text-red-500 text-xs mt-1">Code: {error.code}</p>
         )}
@@ -83,7 +81,10 @@ export default function AdminDisputesPage() {
   }, [])
 
   async function handleRelease(tradeId) {
-    const ok = window.confirm('Release this disputed escrow to the seller?')
+    const ok = window.confirm(
+      'Resolve this dispute in favour of the seller? This will create/queue seller settlement according to your current backend logic.'
+    )
+
     if (!ok) return
 
     setResolvingId(tradeId)
@@ -98,13 +99,16 @@ export default function AdminDisputesPage() {
       return
     }
 
-    setActionSuccess('Dispute resolved: funds released to seller.')
+    setActionSuccess('Dispute resolved in favour of seller. Seller settlement has been handled by the system.')
     await loadDisputes()
     setResolvingId(null)
   }
 
   async function handleRefund(tradeId) {
-    const ok = window.confirm('Refund this disputed escrow to the buyer?')
+    const ok = window.confirm(
+      'Resolve this dispute in favour of the buyer? This will create a buyer refund record according to your current backend logic.'
+    )
+
     if (!ok) return
 
     setResolvingId(tradeId)
@@ -119,7 +123,7 @@ export default function AdminDisputesPage() {
       return
     }
 
-    setActionSuccess('Dispute resolved: funds refunded to buyer.')
+    setActionSuccess('Dispute resolved in favour of buyer. Buyer refund has been created/pending according to the system.')
     await loadDisputes()
     setResolvingId(null)
   }
@@ -129,10 +133,15 @@ export default function AdminDisputesPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
         <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm max-w-md text-center">
           <Shield className="h-10 w-10 text-slate-300 mx-auto mb-4" />
-          <h1 className="text-xl font-extrabold text-slate-900">Admin access required</h1>
+
+          <h1 className="text-xl font-extrabold text-slate-900">
+            Admin access required
+          </h1>
+
           <p className="text-sm text-slate-500 mt-2">
             Only admin users can resolve disputes.
           </p>
+
           <Link
             to="/dashboard"
             className="mt-6 inline-flex px-5 py-3 rounded-xl bg-teal-600 text-white font-bold text-sm"
@@ -148,11 +157,16 @@ export default function AdminDisputesPage() {
     <div className="min-h-screen bg-slate-50">
       <nav className="bg-slate-900 text-white py-4 px-6 md:px-12 flex justify-between items-center sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <Link to="/admin" className="flex items-center gap-1 text-slate-400 hover:text-white text-sm">
+          <Link
+            to="/admin"
+            className="flex items-center gap-1 text-slate-400 hover:text-white text-sm"
+          >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Admin Home</span>
           </Link>
+
           <span className="text-slate-700">|</span>
+
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-teal-400" />
             <span className="font-bold text-lg">Dispute Resolution</span>
@@ -174,11 +188,18 @@ export default function AdminDisputesPage() {
             <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
               Admin Panel
             </p>
+
             <h1 className="text-2xl font-extrabold text-slate-900 mt-1">
               Open Disputes
             </h1>
+
             <p className="text-sm text-slate-500 mt-1">
               Review disputed trades and decide whether to refund buyer or release to seller.
+            </p>
+
+            <p className="text-xs text-slate-400 mt-2">
+              Dispute values are displayed in PTC, with the Naira equivalent shown for manual
+              settlement/refund decisions. 1 PTC = ₦100.
             </p>
           </div>
 
@@ -216,7 +237,11 @@ export default function AdminDisputesPage() {
         {!loading && !pageError && trades.length === 0 && (
           <div className="bg-white border border-slate-100 rounded-3xl p-10 text-center shadow-sm">
             <CheckCircle className="h-10 w-10 text-emerald-400 mx-auto mb-4" />
-            <h2 className="font-extrabold text-slate-900 text-xl">No open disputes</h2>
+
+            <h2 className="font-extrabold text-slate-900 text-xl">
+              No open disputes
+            </h2>
+
             <p className="text-sm text-slate-500 mt-2">
               All disputed trades have been resolved.
             </p>
@@ -253,10 +278,15 @@ export default function AdminDisputesPage() {
 
                     <div className="text-left md:text-right">
                       <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                        Trade Amount
+                        Trade Value
                       </p>
+
                       <p className="text-2xl font-extrabold text-slate-900">
-                        {formatNGN(trade.amount)}
+                        {formatPTC(trade.amount)}
+                      </p>
+
+                      <p className="text-xs text-slate-500 mt-1">
+                        Naira equivalent: {formatNGN(trade.amount)}
                       </p>
                     </div>
                   </div>
@@ -266,13 +296,21 @@ export default function AdminDisputesPage() {
                       <p className="text-xs text-slate-400 font-bold uppercase mb-2">
                         Parties
                       </p>
+
                       <p className="text-sm text-slate-700 flex items-center gap-2">
                         <User className="h-4 w-4 text-slate-400" />
-                        Buyer: <span className="font-bold">{trade.buyer?.full_name || '—'}</span>
+                        Buyer:{' '}
+                        <span className="font-bold">
+                          {trade.buyer?.full_name || '—'}
+                        </span>
                       </p>
+
                       <p className="text-sm text-slate-700 flex items-center gap-2 mt-2">
                         <User className="h-4 w-4 text-slate-400" />
-                        Seller: <span className="font-bold">{trade.seller?.full_name || '—'}</span>
+                        Seller:{' '}
+                        <span className="font-bold">
+                          {trade.seller?.full_name || '—'}
+                        </span>
                       </p>
                     </div>
 
@@ -280,12 +318,18 @@ export default function AdminDisputesPage() {
                       <p className="text-xs text-slate-400 font-bold uppercase mb-2">
                         Dispute
                       </p>
+
                       <p className="text-sm text-slate-700">
-                        Reason: <span className="font-bold">{dispute?.reason || '—'}</span>
+                        Reason:{' '}
+                        <span className="font-bold">
+                          {dispute?.reason || '—'}
+                        </span>
                       </p>
+
                       <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                         {dispute?.message || 'No message provided.'}
                       </p>
+
                       <p className="text-xs text-slate-400 mt-2">
                         Opened: {formatDate(dispute?.created_at)}
                       </p>
@@ -295,10 +339,15 @@ export default function AdminDisputesPage() {
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
                       <p className="text-xs text-emerald-600 font-bold uppercase">
-                        Seller Receives
+                        Release to Seller
                       </p>
+
                       <p className="text-lg font-extrabold text-emerald-800">
-                        {formatNGN(trade.seller_receives)}
+                        {formatPTC(trade.seller_receives)}
+                      </p>
+
+                      <p className="text-xs text-emerald-700 mt-1">
+                        Settlement: {formatNGN(trade.seller_receives)}
                       </p>
                     </div>
 
@@ -306,8 +355,13 @@ export default function AdminDisputesPage() {
                       <p className="text-xs text-orange-600 font-bold uppercase">
                         Refund Buyer
                       </p>
+
                       <p className="text-lg font-extrabold text-orange-800">
-                        {formatNGN(trade.amount)}
+                        {formatPTC(trade.amount)}
+                      </p>
+
+                      <p className="text-xs text-orange-700 mt-1">
+                        Refund: {formatNGN(trade.amount)}
                       </p>
                     </div>
 
@@ -315,10 +369,27 @@ export default function AdminDisputesPage() {
                       <p className="text-xs text-slate-400 font-bold uppercase">
                         Platform Fee
                       </p>
+
                       <p className="text-lg font-extrabold text-slate-800">
-                        {formatNGN(trade.platform_fee)}
+                        {formatPTC(trade.platform_fee)}
+                      </p>
+
+                      <p className="text-xs text-slate-500 mt-1">
+                        Equivalent: {formatNGN(trade.platform_fee)}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
+                    <CreditCard className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      For buyer refund, process the Paystack/manual refund amount of{' '}
+                      <span className="font-bold">{formatNGN(trade.amount)}</span>. For seller
+                      release, settle the seller with{' '}
+                      <span className="font-bold">{formatNGN(trade.seller_receives)}</span>.
+                      Internal values are shown in PTC for platform consistency.
+                    </p>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-3 pt-2">
@@ -335,7 +406,7 @@ export default function AdminDisputesPage() {
                       ) : (
                         <>
                           <DollarSign className="h-4 w-4" />
-                          Refund Buyer
+                          Refund Buyer — {formatPTC(trade.amount)}
                         </>
                       )}
                     </button>
@@ -353,7 +424,7 @@ export default function AdminDisputesPage() {
                       ) : (
                         <>
                           <CheckCircle className="h-4 w-4" />
-                          Release to Seller
+                          Release Seller — {formatPTC(trade.seller_receives)}
                         </>
                       )}
                     </button>

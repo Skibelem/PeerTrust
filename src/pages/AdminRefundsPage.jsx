@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getBuyerRefunds, markBuyerRefundProcessed } from '../services/refundService'
+import { formatPTC, formatNGN } from '../utils/moneyFormatters'
 import {
   ArrowLeft,
   Shield,
@@ -13,18 +14,12 @@ import {
   RotateCcw,
   User,
   DollarSign,
+  CreditCard,
 } from 'lucide-react'
-
-function formatNGN(val) {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 2,
-  }).format(val || 0)
-}
 
 function formatDate(iso) {
   if (!iso) return '—'
+
   return new Intl.DateTimeFormat('en-NG', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -37,12 +32,17 @@ function ErrorBlock({ error, title = 'Error' }) {
   return (
     <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex gap-3">
       <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+
       <div className="min-w-0">
         <p className="font-bold text-red-800 text-sm">{title}</p>
+
         <p className="text-red-700 text-xs mt-1 font-mono break-all">
           {error.message || JSON.stringify(error)}
         </p>
-        {error.code && <p className="text-red-500 text-xs mt-1">Code: {error.code}</p>}
+
+        {error.code && (
+          <p className="text-red-500 text-xs mt-1">Code: {error.code}</p>
+        )}
       </div>
     </div>
   )
@@ -82,9 +82,11 @@ export default function AdminRefundsPage() {
 
   async function handleMarkProcessed(refundId) {
     const note = adminNotes[refundId] || ''
+
     const ok = window.confirm(
       'Have you processed this refund manually in Paystack or your payment dashboard?'
     )
+
     if (!ok) return
 
     setProcessingId(refundId)
@@ -110,10 +112,15 @@ export default function AdminRefundsPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
         <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm max-w-md text-center">
           <Shield className="h-10 w-10 text-slate-300 mx-auto mb-4" />
-          <h1 className="text-xl font-extrabold text-slate-900">Admin access required</h1>
+
+          <h1 className="text-xl font-extrabold text-slate-900">
+            Admin access required
+          </h1>
+
           <p className="text-sm text-slate-500 mt-2">
             Only admin users can manage buyer refunds.
           </p>
+
           <Link
             to="/dashboard"
             className="mt-6 inline-flex px-5 py-3 rounded-xl bg-teal-600 text-white font-bold text-sm"
@@ -129,7 +136,10 @@ export default function AdminRefundsPage() {
     <div className="min-h-screen bg-slate-50">
       <nav className="bg-slate-900 text-white py-4 px-6 md:px-12 flex justify-between items-center sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <Link to="/admin" className="flex items-center gap-1 text-slate-400 hover:text-white text-sm">
+          <Link
+            to="/admin"
+            className="flex items-center gap-1 text-slate-400 hover:text-white text-sm"
+          >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Admin Home</span>
           </Link>
@@ -157,11 +167,18 @@ export default function AdminRefundsPage() {
             <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
               Admin Refunds
             </p>
+
             <h1 className="text-2xl font-extrabold text-slate-900 mt-1">
               Buyer Refund Queue
             </h1>
+
             <p className="text-sm text-slate-500 mt-1">
               Review buyer refunds and mark them as processed after manual Paystack refund.
+            </p>
+
+            <p className="text-xs text-slate-400 mt-2">
+              Refund values are displayed in PTC, with the Naira equivalent shown for manual Paystack refund.
+              1 PTC = ₦100.
             </p>
           </div>
 
@@ -211,7 +228,11 @@ export default function AdminRefundsPage() {
         {!loading && !pageError && refunds.length === 0 && (
           <div className="bg-white border border-slate-100 rounded-3xl p-10 text-center shadow-sm">
             <CheckCircle className="h-10 w-10 text-emerald-400 mx-auto mb-4" />
-            <h2 className="font-extrabold text-slate-900 text-xl">No refunds found</h2>
+
+            <h2 className="font-extrabold text-slate-900 text-xl">
+              No refunds found
+            </h2>
+
             <p className="text-sm text-slate-500 mt-2">
               There are no buyer refunds matching this filter.
             </p>
@@ -255,8 +276,13 @@ export default function AdminRefundsPage() {
                     <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
                       Refund Amount
                     </p>
+
                     <p className="text-2xl font-extrabold text-slate-900">
-                      {formatNGN(refund.amount)}
+                      {formatPTC(refund.amount)}
+                    </p>
+
+                    <p className="text-xs text-slate-500 mt-1">
+                      Paystack refund amount: {formatNGN(refund.amount)}
                     </p>
                   </div>
                 </div>
@@ -266,10 +292,14 @@ export default function AdminRefundsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase mb-2">
                       Buyer
                     </p>
+
                     <p className="text-sm text-slate-700 flex items-center gap-2">
                       <User className="h-4 w-4 text-slate-400" />
-                      <span className="font-bold">{refund.buyer?.full_name || '—'}</span>
+                      <span className="font-bold">
+                        {refund.buyer?.full_name || '—'}
+                      </span>
                     </p>
+
                     <p className="text-xs text-slate-500 mt-2 break-all">
                       {refund.buyer?.email || '—'}
                     </p>
@@ -279,15 +309,18 @@ export default function AdminRefundsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase mb-2">
                       Seller / Trade
                     </p>
+
                     <p className="text-sm text-slate-700">
                       Seller:{' '}
                       <span className="font-bold">
                         {refund.trade?.seller?.full_name || '—'}
                       </span>
                     </p>
+
                     <p className="text-xs text-slate-500 mt-2">
                       Created: {formatDate(refund.created_at)}
                     </p>
+
                     {refund.processed_at && (
                       <p className="text-xs text-emerald-600 mt-2">
                         Processed: {formatDate(refund.processed_at)}
@@ -301,7 +334,12 @@ export default function AdminRefundsPage() {
                     <p className="text-xs text-orange-600 font-bold uppercase">
                       Refund Buyer
                     </p>
+
                     <p className="text-lg font-extrabold text-orange-800">
+                      {formatPTC(refund.amount)}
+                    </p>
+
+                    <p className="text-xs text-orange-700 mt-1">
                       {formatNGN(refund.amount)}
                     </p>
                   </div>
@@ -310,6 +348,7 @@ export default function AdminRefundsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase">
                       Method
                     </p>
+
                     <p className="text-sm font-bold text-slate-800 mt-1">
                       {refund.refund_method || 'paystack_manual_refund'}
                     </p>
@@ -319,10 +358,23 @@ export default function AdminRefundsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase">
                       Payment Reference
                     </p>
+
                     <p className="text-xs font-mono text-slate-700 mt-1 break-all">
                       {refund.payment?.reference || '—'}
                     </p>
                   </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
+                  <CreditCard className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+
+                  <p className="text-xs text-blue-800 leading-relaxed">
+                    Before marking this refund as processed, make sure you have manually processed
+                    the refund through Paystack/payment dashboard for{' '}
+                    <span className="font-bold">{formatNGN(refund.amount)}</span>.
+                    Internal value:{' '}
+                    <span className="font-bold">{formatPTC(refund.amount)}</span>.
+                  </p>
                 </div>
 
                 {refund.status === 'pending' && (
@@ -364,7 +416,10 @@ export default function AdminRefundsPage() {
                     <p className="text-xs text-slate-400 font-bold uppercase">
                       Admin Note
                     </p>
-                    <p className="text-sm text-slate-700 mt-1">{refund.admin_note}</p>
+
+                    <p className="text-sm text-slate-700 mt-1">
+                      {refund.admin_note}
+                    </p>
                   </div>
                 )}
               </div>
