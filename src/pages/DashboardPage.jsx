@@ -98,12 +98,28 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Available Amount */}
-        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Available Amount</p>
-          <p className="text-3xl font-extrabold text-slate-900 mt-2">{formatPTC(wallet?.available_balance || 0)}</p>
-          <p className="text-xs text-slate-400 mt-1">Equivalent: {formatNGN(wallet?.available_balance || 0)}</p>
-        </div>
+       {/* Available Amount */}
+      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+          Available Amount
+        </p>
+
+        <p className="text-3xl font-extrabold text-slate-900 mt-2">
+          {formatPTC(wallet?.available_balance || 0)}
+        </p>
+
+        <p className="text-xs text-slate-400 mt-1">
+          Equivalent: {formatNGN(wallet?.available_balance || 0)}
+        </p>
+
+        <Link
+          to="/wallet/fund"
+          className="mt-4 inline-flex items-center justify-center gap-2 w-full px-4 py-3 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-xl transition-colors"
+        >
+          <Wallet className="h-4 w-4" />
+          Fund Account
+        </Link>
+      </div>
 
 
         {/* Clean role-based dashboard shortcuts */}

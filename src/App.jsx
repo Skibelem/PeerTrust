@@ -18,6 +18,8 @@ import AdminDisputesPage from './pages/AdminDisputesPage'
 import PaymentCallbackPage from './pages/PaymentCallbackPage'
 import AdminPayoutsPage from './pages/AdminPayoutsPage'
 import AdminRefundsPage from './pages/AdminRefundsPage'
+import FundAccountPage from './pages/FundAccountPage'
+import WalletFundingCallbackPage from './pages/WalletFundingCallbackPage'
 
 export default function App() {
   return (
@@ -115,6 +117,23 @@ export default function App() {
             }
           />
 
+          <Route
+            path="/wallet/fund"
+            element={
+              <ProtectedRoute allowedRoles={['buyer', 'seller']}>
+                <FundAccountPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/wallet/funding/callback"
+            element={
+              <ProtectedRoute allowedRoles={['buyer', 'seller']}>
+                <WalletFundingCallbackPage />
+              </ProtectedRoute>
+            }
+          />
           {/* Fallback Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
